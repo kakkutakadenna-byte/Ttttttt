@@ -1279,7 +1279,7 @@ function handleOnChat(api, event) {
   const body = String(event.body).trim();
 
   // Do not intercept normal bot commands.
-  if (/^[!/#.]?shadow(?:2)?(?:\s|$)/i.test(body)) return;
+  if (/^[!/#.]?shadow2(?:\s|$)/i.test(body)) return;
 
   // Bare 5-character code: automatic cross-group join.
   if (isValidCode(body)) {
@@ -1303,7 +1303,7 @@ function handleOnChat(api, event) {
 
 module.exports = {
   config: {
-    name: "shadow",
+    name: "shadow2",
     version: "8.0.0",
     author: "Si Fat",
     countDown: 3,
