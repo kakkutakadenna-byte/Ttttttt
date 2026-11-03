@@ -1,4 +1,3 @@
-// গ্লোবাল লুপ স্টোরেজ রাখার জন্য
 global.galiSpamSessions = global.galiSpamSessions || {};
 
 module.exports.config = {
@@ -16,7 +15,6 @@ module.exports.onStart = async function({ api, event, args }) {
     const threadID = event.threadID;
     const action = args[0];
 
-    // যদি কেউ বন্ধ করতে চায়
     if (action === "stop" || action === "off") {
         if (global.galiSpamSessions[threadID]) {
             clearInterval(global.galiSpamSessions[threadID]);
@@ -27,7 +25,6 @@ module.exports.onStart = async function({ api, event, args }) {
         }
     }
 
-    // কবিতার ছন্দ এবং হার্ডকোর স্লাং মিলিয়ে বিশাল লিস্ট
     const slangs = [
         "সকালে উঠে করিস ফাউ বকবক,\nতোর মগজে গোবর ভরা, তুই একটা অবালক!",
         "খানকিরপোলা তোর মাইরা চুদি আজ,\nসারাদিন শুধু করিস তুই ফাউ গবাদিপশুর কাজ!",
@@ -52,7 +49,7 @@ module.exports.onStart = async function({ api, event, args }) {
         "মাদারচোদ কোথাকার, ফালতু চুদুরবুদুর একদম বন্ধ করবি!",
         "তোর গুষ্টির মাথায় মুতি হালায়, ফাউ চুদাস না তো বেশি!",
         "চুদি তোর গুষ্টি শুদ্ধা, ভাল্লাগে না ফালতু ফাইজলামি!",
-        "তোর বাপের নাম কি ভুইলা গেছোস নাকি রে খানকিরপোলা?",
+        "তোর বাপের নাম কি ভুইলা গেছোস নাকি রে খানকিরপোলা!",
         "শালা চুদির ভাই, সারাদিন খালি বাল পাকনামি করিস ক্যান?",
         "তোর চৌদ্দগোষ্ঠীর গুষ্টি চুদাই, ফাও বকবক বন্ধ কর!",
         "মাগীর পোলা মাগিবাজি করো কার লগে? আইসো না সামনে!",
@@ -61,7 +58,6 @@ module.exports.onStart = async function({ api, event, args }) {
         "তোর মাইয়া জাতের গুষ্টি তুলিয়া গালি দিমু একটা টান দিয়া!"
     ];
 
-    // কেউ ট্যাগ করা আছে কিনা দেখা
     let targetID = null;
     let targetName = "";
     if (Object.keys(event.mentions).length > 0) {
@@ -75,7 +71,6 @@ module.exports.onStart = async function({ api, event, args }) {
 
     api.sendMessage("Gali spam started! Type /gali stop to stop.", threadID);
 
-    // প্রতি ১.৫ সেকেন্ড পর পর গালি পাঠানোর লুপ
     global.galiSpamSessions[threadID] = setInterval(() => {
         const randomSlang = slangs[Math.floor(Math.random() * slangs.length)];
 
@@ -89,4 +84,3 @@ module.exports.onStart = async function({ api, event, args }) {
         }
     }, 1500);
 };
-        
