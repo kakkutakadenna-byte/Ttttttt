@@ -3,7 +3,6 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { Readable } = require("stream");
 
 let Canvas;
 try { Canvas = require("canvas"); } catch (_) { Canvas = null; }
@@ -11,8 +10,10 @@ try { Canvas = require("canvas"); } catch (_) { Canvas = null; }
 const ROOT = path.join(__dirname, "pokemon_world_data");
 const DB_FILE = path.join(ROOT, "database.json");
 const BACKUP_FILE = path.join(ROOT, "backup.json");
+const IMAGE_DIR = path.join(ROOT, "images");
 
 fs.mkdirSync(ROOT, { recursive: true });
+fs.mkdirSync(IMAGE_DIR, { recursive: true });
 
 const MAX_TEAM = 6;
 const MAX_STORAGE = 200;
@@ -137,7 +138,8 @@ function readJSON(file, fallback) {
     return fs.existsSync(file)
       ? JSON.parse(fs.readFileSync(file, "utf8"))
       : fallback;
-  } catch (_) {
+  } catch (e) {
+    console.error("[POKEMON READ]", e);
     return fallback;
   }
 }
@@ -164,60 +166,11 @@ function saveDB() {
     fs.writeFileSync(temp, JSON.stringify(DB, null, 2));
     fs.renameSync(temp, DB_FILE);
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(DB, null, 2));
+    return true;
   } catch (e) {
     console.error("[POKEMON SAVE]", e);
+    return false;
   }
-}
-
-function getPlayer(id, name = "Trainer") {
-  if (!DB.players[id]) {
-    DB.players[id] = {
-      id, name, coins: 500, xp: 0, level: 1,
-      wins: 0, losses: 0, draws: 0,
-      pokemon: [], team: [], badges: [], pokedex: [],
-      items: {
-        pokeball: 10, greatball: 3, ultraball: 1,
-        potion: 5, superpotion: 2, revive: 1
-      },
-      history: [], recoveryCode: uid(),
-      created: Date.now()
-    };
-  }
-
-  const p = DB.players[id];
-  p.name = name || p.name;
-  p.coins = Math.max(0, Number(p.coins) || 0);
-  p.pokemon ||= [];
-  p.team ||= [];
-  p.badges ||= [];
-  p.pokedex ||= [];
-  p.items ||= {};
-  p.history ||= [];
-  p.xp ||= 0;
-  p.level ||= 1;
-  p.wins ||= 0;
-  p.losses ||= 0;
-  p.draws ||= 0;
-  p.recoveryCode ||= uid();
-
-  for (const key of ["pokeball", "greatball", "ultraball", "potion", "superpotion", "revive"]) {
-    p.items[key] = Math.max(0, Number(p.items[key]) || 0);
-  }
-
-  for (const mon of p.pokemon) {
-    mon.uid ||= uid();
-    mon.level = Math.max(1, Number(mon.level) || 5);
-    mon.maxHp = Math.max(20, Number(mon.maxHp) || 35 + mon.level * 4);
-    mon.hp = Math.max(0, Math.min(mon.maxHp, Number(mon.hp ?? mon.maxHp)));
-    mon.attack = Number(mon.attack) || 9 + mon.level * 2;
-    mon.defense = Number(mon.defense) || 6 + mon.level;
-    mon.xp ||= 0;
-    mon.moves ||= ["Tackle"];
-    mon.type ||= speciesType(mon.name);
-    mon.shiny = !!mon.shiny;
-  }
-
-  return p;
 }
 
 function speciesType(name) {
@@ -227,9 +180,87 @@ function speciesType(name) {
   return "Normal";
 }
 
+function getPlayer(id, name = null) {
+  id = String(id);
+
+  if (!DB.players[id]) {
+    DB.players[id] = {
+      id,
+      name: safeName(name || "Trainer"),
+      coins: 500,
+      xp: 0,
+      level: 1,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      pokemon: [],
+      team: [],
+      badges: [],
+      pokedex: [],
+      items: {
+        pokeball: 10,
+        greatball: 3,
+        ultraball: 1,
+        potion: 5,
+        superpotion: 2,
+        revive: 1
+      },
+      history: [],
+      recoveryCode: uid(),
+      created: Date.now()
+    };
+  }
+
+  const p = DB.players[id];
+
+  // Do not replace a saved name when getPlayer(id) is called.
+  if (name) p.name = safeName(name);
+  p.name ||= "Trainer";
+
+  p.coins = Math.max(0, Number(p.coins) || 0);
+  p.xp = Math.max(0, Number(p.xp) || 0);
+  p.level = Math.max(1, Number(p.level) || 1);
+  p.wins = Math.max(0, Number(p.wins) || 0);
+  p.losses = Math.max(0, Number(p.losses) || 0);
+  p.draws = Math.max(0, Number(p.draws) || 0);
+
+  p.pokemon ||= [];
+  p.team ||= [];
+  p.badges ||= [];
+  p.pokedex ||= [];
+  p.items ||= {};
+  p.history ||= [];
+  p.recoveryCode ||= uid();
+
+  for (const key of [
+    "pokeball", "greatball", "ultraball",
+    "potion", "superpotion", "revive"
+  ]) {
+    p.items[key] = Math.max(0, Number(p.items[key]) || 0);
+  }
+
+  for (const mon of p.pokemon) {
+    mon.uid ||= uid();
+    mon.level = Math.max(1, Math.min(100, Number(mon.level) || 5));
+    mon.maxHp = Math.max(20, Number(mon.maxHp) || 35 + mon.level * 4);
+    mon.hp = Math.max(0, Math.min(mon.maxHp, Number(mon.hp ?? mon.maxHp)));
+    mon.attack = Number(mon.attack) || 9 + mon.level * 2;
+    mon.defense = Number(mon.defense) || 6 + mon.level;
+    mon.xp = Math.max(0, Number(mon.xp) || 0);
+    mon.moves = Array.isArray(mon.moves) && mon.moves.length
+      ? mon.moves
+      : ["Tackle"];
+    mon.type ||= speciesType(mon.name);
+    mon.shiny = !!mon.shiny;
+  }
+
+  return p;
+}
+
 function rarity(name) {
   if (MYTHICAL.has(name)) return "Mythical";
   if (LEGENDARY.has(name)) return "Legendary";
+
   const n = Math.random();
   if (n < 0.04) return "Epic";
   if (n < 0.15) return "Rare";
@@ -240,12 +271,19 @@ function rarity(name) {
 function makePokemon(name, level = 5, shiny = Math.random() < 0.025) {
   const type = speciesType(name);
   const lv = Math.max(1, Math.min(100, Number(level) || 5));
-  const moves = MOVES.filter(m => m.type === type || m.type === "Normal")
-    .slice(0, 4).map(m => m.name);
+  const moves = MOVES
+    .filter(m => m.type === type || m.type === "Normal")
+    .slice(0, 4)
+    .map(m => m.name);
 
   return {
-    uid: uid(), name, type, rarity: rarity(name), shiny,
-    level: lv, xp: 0,
+    uid: uid(),
+    name,
+    type,
+    rarity: rarity(name),
+    shiny,
+    level: lv,
+    xp: 0,
     maxHp: 35 + lv * 4,
     hp: 35 + lv * 4,
     attack: 9 + lv * 2,
@@ -256,16 +294,22 @@ function makePokemon(name, level = 5, shiny = Math.random() < 0.025) {
 
 function findPokemon(player, key) {
   if (!key) return null;
+
   const value = String(key).trim().toLowerCase();
+
   return player.pokemon.find((m, i) =>
-    m.uid.toLowerCase() === value ||
-    m.name.toLowerCase() === value ||
+    String(m.uid).toLowerCase() === value ||
+    String(m.name).toLowerCase() === value ||
     String(i + 1) === value
   ) || null;
 }
 
 function healPokemon(mon, full = true) {
-  if (mon) mon.hp = full ? mon.maxHp : Math.min(mon.maxHp, mon.hp + 30);
+  if (mon) {
+    mon.hp = full
+      ? mon.maxHp
+      : Math.min(mon.maxHp, mon.hp + 30);
+  }
 }
 
 function typeMultiplier(atk, def) {
@@ -317,7 +361,13 @@ function typeMultiplier(atk, def) {
 function addLog(player, message) {
   player.history.unshift({ message, at: Date.now() });
   player.history = player.history.slice(0, 30);
-  DB.logs.unshift({ id: player.id, message, at: Date.now() });
+
+  DB.logs.unshift({
+    id: player.id,
+    message,
+    at: Date.now()
+  });
+
   DB.logs = DB.logs.slice(0, 150);
 }
 
@@ -328,12 +378,17 @@ function parseTeamArgs(args) {
 function getTeam(player, requested = []) {
   let mons = requested.length
     ? requested.map(x => findPokemon(player, x)).filter(Boolean)
-    : (player.team || []).map(id => player.pokemon.find(m => m.uid === id)).filter(Boolean);
+    : (player.team || [])
+      .map(id => player.pokemon.find(m => m.uid === id))
+      .filter(Boolean);
 
-  if (!mons.length) mons = player.pokemon.filter(m => m.hp > 0).slice(0, MAX_TEAM);
+  if (!mons.length) {
+    mons = player.pokemon.filter(m => m.hp > 0).slice(0, MAX_TEAM);
+  }
 
-  return [...new Map(mons.filter(m => m.hp > 0).map(m => [m.uid, m])).values()]
-    .slice(0, MAX_TEAM);
+  return [...new Map(
+    mons.filter(m => m.hp > 0).map(m => [m.uid, m])
+  ).values()].slice(0, MAX_TEAM);
 }
 
 function battleMon(player, battle, side) {
@@ -351,27 +406,37 @@ function advanceFainted(player, battle, side) {
     if (mon && mon.hp > 0) return mon;
     battle[key]++;
   }
+
   return null;
 }
 
 function aliveCount(player, battle, side) {
   const ids = side === 1 ? battle.team1 : battle.team2;
+
   return ids.filter(id => {
-    const m = player.pokemon.find(x => x.uid === id);
-    return m && m.hp > 0;
+    const mon = player.pokemon.find(x => x.uid === id);
+    return mon && mon.hp > 0;
   }).length;
 }
 
 function createBattle(mode, p1, p2, team1, team2, extra = {}) {
   const battle = {
-    id: uid(), mode, p1: p1.id, p2: p2.id,
+    id: uid(),
+    mode,
+    p1: p1.id,
+    p2: p2.id,
     team1: team1.map(m => m.uid),
     team2: team2.map(m => m.uid),
-    index1: 0, index2: 0,
-    turn: p1.id, turns: 0, status: "active",
-    extra, created: Date.now(),
+    index1: 0,
+    index2: 0,
+    turn: p1.id,
+    turns: 0,
+    status: "active",
+    extra,
+    created: Date.now(),
     lastAction: "Battle started!"
   };
+
   DB.battles[battle.id] = battle;
   return battle;
 }
@@ -387,7 +452,9 @@ function isNPC(id) {
 }
 
 function safeName(name) {
-  return String(name || "Trainer").replace(/[<>]/g, "").slice(0, 24);
+  return String(name || "Trainer")
+    .replace(/[<>]/g, "")
+    .slice(0, 24);
 }
 
 function getBattlePlayers(battle) {
@@ -397,15 +464,100 @@ function getBattlePlayers(battle) {
   };
 }
 
+// ================ BATTLE END HANDLER ================
+
+function endBattle(battle, winnerID, loserID, reason = "Battle ended") {
+  if (!battle || battle.status !== "active") return false;
+
+  battle.status = "ended";
+  battle.reason = reason;
+  battle.winner = winnerID || null;
+  battle.loser = loserID || null;
+  battle.ended = Date.now();
+
+  const winner = winnerID ? getPlayer(winnerID) : null;
+  const loser = loserID ? getPlayer(loserID) : null;
+
+  if (winner && !isNPC(winnerID)) {
+    winner.wins = (winner.wins || 0) + 1;
+    winner.xp = (winner.xp || 0) + 50;
+
+    const reward = battle.mode === "gym"
+      ? (GYMS.find(g => g.id === Number(battle.extra?.gym))?.reward || 300)
+      : battle.mode === "wild" ? 100 : 50;
+
+    winner.coins = (winner.coins || 0) + reward;
+    battle.reward = reward;
+
+    if (battle.mode === "gym") {
+      const gymNumber = Number(battle.extra?.gym);
+      const badge = String(gymNumber);
+
+      if (gymNumber >= 1 && gymNumber <= 8 &&
+          !winner.badges.includes(badge)) {
+        winner.badges.push(badge);
+        battle.badgeReward = BADGES[gymNumber - 1];
+      }
+    }
+
+    addLog(winner, `Won ${battle.mode} battle. ${reason}`);
+  }
+
+  if (loser && !isNPC(loserID)) {
+    loser.losses = (loser.losses || 0) + 1;
+    addLog(loser, `Lost ${battle.mode} battle. ${reason}`);
+  }
+
+  if (winner && !isNPC(winnerID) && loser && !isNPC(loserID)) {
+    addLog(winner, `Battle reward: ${battle.reward || 0} coins`);
+  }
+
+  // Remove temporary NPC trainer data after battle.
+  if (isNPC(battle.p1)) delete DB.players[battle.p1];
+  if (isNPC(battle.p2)) delete DB.players[battle.p2];
+
+  saveDB();
+  return true;
+}
+
+function isDrawBattle(battle) {
+  if (!battle || battle.status !== "active") return false;
+
+  battle.status = "ended";
+  battle.reason = "Draw";
+  battle.ended = Date.now();
+
+  const p1 = getPlayer(battle.p1);
+  const p2 = getPlayer(battle.p2);
+
+  if (!isNPC(p1.id)) {
+    p1.draws = (p1.draws || 0) + 1;
+    addLog(p1, "Battle ended in a draw.");
+  }
+
+  if (!isNPC(p2.id)) {
+    p2.draws = (p2.draws || 0) + 1;
+    addLog(p2, "Battle ended in a draw.");
+  }
+
+  if (isNPC(p1.id)) delete DB.players[p1.id];
+  if (isNPC(p2.id)) delete DB.players[p2.id];
+
+  saveDB();
+  return true;
+}
+
 // ================ DIRECT CHAT IMAGE RENDERER ================
 
 function rr(ctx, x, y, w, h, r, color, stroke) {
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
+
   if (color) {
     ctx.fillStyle = color;
     ctx.fill();
   }
+
   if (stroke) {
     ctx.strokeStyle = stroke;
     ctx.lineWidth = 2;
@@ -426,14 +578,21 @@ function typeColor(type) {
 
 function drawBar(ctx, x, y, w, h, hp, max) {
   rr(ctx, x, y, w, h, 9, "#17213c");
+
   const ratio = Math.max(0, Math.min(1, hp / Math.max(1, max)));
-  const color = ratio > 0.5 ? "#36e69b" : ratio > 0.2 ? "#ffd447" : "#ff5577";
-  if (ratio > 0) rr(ctx, x + 3, y + 3, (w - 6) * ratio, h - 6, 7, color);
+  const color = ratio > 0.5
+    ? "#36e69b"
+    : ratio > 0.2 ? "#ffd447" : "#ff5577";
+
+  if (ratio > 0) {
+    rr(ctx, x + 3, y + 3, (w - 6) * ratio, h - 6, 7, color);
+  }
 }
 
 function drawCreature(ctx, x, y, size, type, flip = false) {
   ctx.save();
   ctx.translate(x, y);
+
   if (flip) ctx.scale(-1, 1);
 
   const color = typeColor(type);
@@ -443,7 +602,11 @@ function drawCreature(ctx, x, y, size, type, flip = false) {
   ctx.ellipse(0, size * 0.45, size * 0.55, size * 0.13, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const grad = ctx.createRadialGradient(-size * 0.2, -size * 0.25, 4, 0, 0, size * 0.65);
+  const grad = ctx.createRadialGradient(
+    -size * 0.2, -size * 0.25, 4,
+    0, 0, size * 0.65
+  );
+
   grad.addColorStop(0, "#ffffff");
   grad.addColorStop(0.25, color);
   grad.addColorStop(1, "#171b38");
@@ -489,7 +652,8 @@ function sceneBuffer(title, subtitle, lines = [], battleData = null) {
   if (!Canvas) return null;
 
   try {
-    const W = 1200, H = 675;
+    const W = 1200;
+    const H = 675;
     const canvas = Canvas.createCanvas(W, H);
     const ctx = canvas.getContext("2d");
 
@@ -497,6 +661,7 @@ function sceneBuffer(title, subtitle, lines = [], battleData = null) {
     bg.addColorStop(0, "#071329");
     bg.addColorStop(0.48, "#17264c");
     bg.addColorStop(1, "#32134b");
+
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
@@ -508,15 +673,18 @@ function sceneBuffer(title, subtitle, lines = [], battleData = null) {
     }
 
     rr(ctx, 28, 22, W - 56, 100, 24, "rgba(255,255,255,0.09)");
+
     ctx.fillStyle = "#fff";
     ctx.font = "bold 43px Sans";
     ctx.fillText(String(title).slice(0, 36), 55, 75);
+
     ctx.fillStyle = "#b9ceff";
     ctx.font = "22px Sans";
     ctx.fillText(String(subtitle).slice(0, 65), 58, 105);
 
     if (battleData && (battleData.a || battleData.b)) {
-      const a = battleData.a, b = battleData.b;
+      const a = battleData.a;
+      const b = battleData.b;
 
       rr(ctx, 35, 145, 1130, 365, 28, "rgba(7,12,35,0.72)");
       rr(ctx, 65, 165, 420, 105, 20, "rgba(20,40,75,0.96)");
@@ -544,23 +712,28 @@ function sceneBuffer(title, subtitle, lines = [], battleData = null) {
       ctx.fillText("VS", 600, 350);
 
       rr(ctx, 65, 525, 1070, 95, 20, "rgba(255,255,255,0.09)");
+
       ctx.textAlign = "left";
       ctx.fillStyle = "#fff";
       ctx.font = "bold 25px Sans";
       ctx.fillText(String(battleData.note || "Battle in progress").slice(0, 65), 90, 565);
+
       ctx.font = "19px Sans";
       ctx.fillStyle = "#a9caff";
       ctx.fillText(
         `Turn ${battleData.turns || 0} • ${battleData.mode || "Battle"} • ${battleData.id || ""}`,
-        90, 598
+        90,
+        598
       );
     } else {
       rr(ctx, 35, 145, 1130, 480, 28, "rgba(7,12,35,0.72)");
+
       ctx.fillStyle = "#fff";
       ctx.font = "25px Sans";
-      lines.slice(0, 11).forEach((line, i) =>
-        ctx.fillText(String(line).slice(0, 75), 75, 210 + i * 36)
-      );
+
+      lines.slice(0, 11).forEach((line, i) => {
+        ctx.fillText(String(line).slice(0, 75), 75, 210 + i * 36);
+      });
     }
 
     ctx.textAlign = "center";
@@ -579,17 +752,50 @@ function sendText(api, threadID, body, callback) {
   return api.sendMessage(body, threadID, callback);
 }
 
+// Send a real PNG file stream so Messenger can identify it as an image.
 function sendScene(api, threadID, title, subtitle, lines = [], battleData = null) {
   const buffer = sceneBuffer(title, subtitle, lines, battleData);
   const body = [title, subtitle, ...lines].filter(Boolean).join("\n");
 
-  if (!buffer) return api.sendMessage(body, threadID);
+  if (!buffer) {
+    return api.sendMessage(body, threadID);
+  }
 
-  // Messenger attachment: image appears directly in chat
-  return api.sendMessage({
-    body,
-    attachment: Readable.from([buffer])
-  }, threadID);
+  const imagePath = path.join(
+    IMAGE_DIR,
+    `pokemon_${Date.now()}_${uid()}.png`
+  );
+
+  try {
+    fs.writeFileSync(imagePath, buffer);
+
+    const attachment = fs.createReadStream(imagePath);
+
+    return api.sendMessage({
+      body,
+      attachment
+    }, threadID, (err) => {
+      attachment.destroy();
+
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        } catch (_) {}
+      }, 3000);
+
+      if (err) {
+        console.error("[POKEMON SEND IMAGE]", err);
+      }
+    });
+  } catch (e) {
+    console.error("[POKEMON IMAGE FILE]", e);
+
+    try {
+      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+    } catch (_) {}
+
+    return api.sendMessage(body, threadID);
+  }
 }
 
 function battleScene(api, threadID, battle, p1, p2, note = "") {
@@ -597,7 +803,9 @@ function battleScene(api, threadID, battle, p1, p2, note = "") {
   const b = battleMon(p2, battle, 2);
 
   return sendScene(
-    api, threadID, "⚔️ POKEMON BATTLE",
+    api,
+    threadID,
+    "⚔️ POKEMON BATTLE",
     `${p1.name} VS ${p2.name}`,
     [
       `${p1.name}: ${a ? `${a.name} ${a.hp}/${a.maxHp} HP` : "No Pokémon"}`,
@@ -607,9 +815,14 @@ function battleScene(api, threadID, battle, p1, p2, note = "") {
       "Commands: p attack | p switch 2 | p surrender"
     ],
     {
-      a, b, nameA: p1.name, nameB: p2.name,
-      turns: battle.turns, mode: battle.mode,
-      id: battle.id, note: note || battle.lastAction
+      a,
+      b,
+      nameA: p1.name,
+      nameB: p2.name,
+      turns: battle.turns,
+      mode: battle.mode,
+      id: battle.id,
+      note: note || battle.lastAction
     }
   );
 }
@@ -656,7 +869,7 @@ module.exports = {
   config: {
     name: "pokemon",
     aliases: ["p", "pk", "pok"],
-    version: "8.0.0",
+    version: "8.1.0",
     author: "Si Fat",
     role: 0,
     shortDescription: "Pokemon World Ultimate RPG",
@@ -666,7 +879,7 @@ module.exports = {
   },
 
   onStart: async function ({ api, event, args }) {
-    const id = event.senderID;
+    const id = String(event.senderID);
     const threadID = event.threadID;
     const name = safeName(event.senderName || "Trainer");
     const p = getPlayer(id, name);
@@ -675,14 +888,16 @@ module.exports = {
     const sub = String(args[1] || "").toLowerCase();
     const save = () => saveDB();
 
-    // ================= HELP =================
-
+    // HELP
     if (cmd === "help" || cmd === "menu") {
-      return sendScene(api, threadID, "POKEMON WORLD", "Ultimate Trainer Adventure", usage().split("\n").slice(1));
+      return sendScene(
+        api, threadID, "POKEMON WORLD",
+        "Ultimate Trainer Adventure",
+        usage().split("\n").slice(1)
+      );
     }
 
-    // ================= START =================
-
+    // START
     if (cmd === "start" || cmd === "register") {
       save();
 
@@ -695,8 +910,7 @@ module.exports = {
       ]);
     }
 
-    // ================= HUNT =================
-
+    // HUNT
     if (cmd === "hunt" || cmd === "find") {
       const old = DB.hunts[id];
 
@@ -712,8 +926,14 @@ module.exports = {
         ]);
       }
 
-      const species = SPECIES_NAMES[Math.floor(Math.random() * SPECIES_NAMES.length)];
-      const mon = makePokemon(species, 3 + Math.floor(Math.random() * 20));
+      const species = SPECIES_NAMES[
+        Math.floor(Math.random() * SPECIES_NAMES.length)
+      ];
+
+      const mon = makePokemon(
+        species,
+        3 + Math.floor(Math.random() * 20)
+      );
 
       DB.hunts[id] = {
         mon,
@@ -722,23 +942,29 @@ module.exports = {
 
       save();
 
-      return sendScene(api, threadID, "🌿 WILD POKEMON!", `${mon.shiny ? "✨ SHINY " : ""}${mon.name} appeared!`, [
-        `Type: ${mon.type}`,
-        `Rarity: ${mon.rarity}`,
-        `Level: ${mon.level}`,
-        `HP: ${mon.hp}/${mon.maxHp}`,
-        "Use p catch to catch this Pokémon.",
-        "Encounter expires in 3 minutes."
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "🌿 WILD POKEMON!",
+        `${mon.shiny ? "✨ SHINY " : ""}${mon.name} appeared!`,
+        [
+          `Type: ${mon.type}`,
+          `Rarity: ${mon.rarity}`,
+          `Level: ${mon.level}`,
+          `HP: ${mon.hp}/${mon.maxHp}`,
+          "Use p catch to catch this Pokémon.",
+          "Encounter expires in 3 minutes."
+        ]
+      );
     }
 
-    // ================= CATCH =================
-
+    // CATCH
     if (cmd === "catch") {
       const hunt = DB.hunts[id];
 
       if (!hunt || hunt.expires < Date.now()) {
         delete DB.hunts[id];
+        save();
         return sendText(api, threadID, "❌ No active Pokémon. Use p hunt.");
       }
 
@@ -746,8 +972,9 @@ module.exports = {
         return sendText(api, threadID, "Your Pokémon storage is full.");
       }
 
-      const ball = p.items.ultraball > 0 ? "ultraball" :
-        p.items.greatball > 0 ? "greatball" : "pokeball";
+      const ball = p.items.ultraball > 0 ? "ultraball"
+        : p.items.greatball > 0 ? "greatball"
+        : "pokeball";
 
       if (!p.items[ball]) {
         return sendText(api, threadID, "No Poké Balls available. Use p shop.");
@@ -791,42 +1018,52 @@ module.exports = {
       ]);
     }
 
-    // ================= LIST =================
-
+    // LIST POKEMON
     if ((cmd === "list" && sub === "pokemon") || cmd === "pokemonlist") {
       if (!p.pokemon.length) {
         return sendText(api, threadID, "You have no Pokémon. Use p hunt.");
       }
 
-      const page = Math.max(1, Number(args[2]) || 1);
-      const start = (page - 1) * 30;
+      const page = Math.max(1, Math.floor(Number(args[2]) || 1));
+      const totalPages = Math.max(1, Math.ceil(p.pokemon.length / 30));
+      const safePage = Math.min(page, totalPages);
+      const start = (safePage - 1) * 30;
 
       const lines = p.pokemon.slice(start, start + 30).map((m, i) =>
         `${start + i + 1}. ${m.shiny ? "✨" : ""}${m.name} Lv.${m.level} | ${m.hp}/${m.maxHp} HP | ${m.type} | ID:${m.uid}`
       );
 
       lines.push(`Total: ${p.pokemon.length}/${MAX_STORAGE}`);
-      lines.push(`Page: ${page}`);
+      lines.push(`Page: ${safePage}/${totalPages}`);
 
       return sendScene(api, threadID, "YOUR POKEMON STORAGE", p.name, lines);
     }
 
+    // BADGES
     if ((cmd === "list" && sub === "badges") || cmd === "badges") {
-      return sendScene(api, threadID, "BADGE COLLECTION", `${p.badges.length}/8`, BADGES.map((b, i) =>
-        `${p.badges.includes(String(i + 1)) ? "🏅" : "🔒"} ${i + 1}. ${b}`
-      ));
+      return sendScene(
+        api,
+        threadID,
+        "BADGE COLLECTION",
+        `${p.badges.length}/8`,
+        BADGES.map((b, i) =>
+          `${p.badges.includes(String(i + 1)) ? "🏅" : "🔒"} ${i + 1}. ${b}`
+        )
+      );
     }
 
-    // ================= TEAM =================
-
+    // TEAM
     if (cmd === "team") {
       const requested = parseTeamArgs(args.slice(1));
 
       if (requested.length) {
-        const selected = requested.map(x => findPokemon(p, x)).filter(Boolean);
+        const selected = requested
+          .map(x => findPokemon(p, x))
+          .filter(Boolean);
 
-        const unique = [...new Map(selected.map(m => [m.uid, m])).values()]
-          .filter(m => m.hp > 0);
+        const unique = [
+          ...new Map(selected.map(m => [m.uid, m])).values()
+        ].filter(m => m.hp > 0);
 
         if (!unique.length) {
           return sendText(api, threadID, "No healthy Pokémon selected.");
@@ -839,33 +1076,51 @@ module.exports = {
         p.team = unique.map(m => m.uid);
         save();
 
-        return sendScene(api, threadID, "TEAM SAVED!", `${unique.length}/6 Pokémon`, unique.map((m, i) =>
-          `${i + 1}. ${m.name} Lv.${m.level} HP ${m.hp}/${m.maxHp}`
-        ));
+        return sendScene(
+          api,
+          threadID,
+          "TEAM SAVED!",
+          `${unique.length}/6 Pokémon`,
+          unique.map((m, i) =>
+            `${i + 1}. ${m.name} Lv.${m.level} HP ${m.hp}/${m.maxHp}`
+          )
+        );
       }
 
       const team = getTeam(p);
 
-      return sendScene(api, threadID, "YOUR BATTLE TEAM", `${team.length}/6 Pokémon`, team.map((m, i) =>
-        `${i + 1}. ${m.name} Lv.${m.level} HP ${m.hp}/${m.maxHp}`
-      ));
+      return sendScene(
+        api,
+        threadID,
+        "YOUR BATTLE TEAM",
+        `${team.length}/6 Pokémon`,
+        team.map((m, i) =>
+          `${i + 1}. ${m.name} Lv.${m.level} HP ${m.hp}/${m.maxHp}`
+        )
+      );
     }
 
-    // ================= POKEDEX =================
-
+    // POKEDEX
     if (cmd === "dex" || cmd === "pokedex") {
-      const page = Math.max(1, Number(args[1]) || 1);
-      const start = (page - 1) * 30;
+      const page = Math.max(1, Math.floor(Number(args[1]) || 1));
+      const totalPages = Math.ceil(SPECIES_NAMES.length / 30);
+      const safePage = Math.min(page, totalPages);
+      const start = (safePage - 1) * 30;
 
       const lines = SPECIES_NAMES.slice(start, start + 30).map((n, i) =>
         `${p.pokedex.includes(n) ? "✅" : "❔"} ${start + i + 1}. ${n}`
       );
 
-      return sendScene(api, threadID, "POKEDEX", `Page ${page} | ${SPECIES_NAMES.length} Pokémon`, lines);
+      return sendScene(
+        api,
+        threadID,
+        "POKEDEX",
+        `Page ${safePage}/${totalPages} | ${SPECIES_NAMES.length} Pokémon`,
+        lines
+      );
     }
 
-    // ================= PROFILE =================
-
+    // PROFILE
     if (cmd === "profile" || cmd === "me") {
       return sendScene(api, threadID, "TRAINER PROFILE", p.name, [
         `Level: ${p.level}`,
@@ -888,8 +1143,7 @@ module.exports = {
       ]);
     }
 
-    // ================= DAILY =================
-
+    // DAILY
     if (cmd === "daily") {
       const today = new Date().toISOString().slice(0, 10);
 
@@ -912,14 +1166,22 @@ module.exports = {
       ]);
     }
 
-    // ================= HEAL =================
-
+    // HEAL
     if (cmd === "heal") {
-      const target = args[1] ? findPokemon(p, args[1]) : null;
+      const target = args[1]
+        ? findPokemon(p, args.slice(1).join(" "))
+        : null;
+
+      if (args[1] && !target) {
+        return sendText(api, threadID, "Pokémon not found.");
+      }
 
       if (target) {
         if (target.hp <= 0) {
-          if (!p.items.revive) return sendText(api, threadID, "You need a Revive.");
+          if (!p.items.revive) {
+            return sendText(api, threadID, "You need a Revive.");
+          }
+
           p.items.revive--;
           target.hp = Math.ceil(target.maxHp / 2);
         } else if (p.items.superpotion > 0) {
@@ -946,11 +1208,19 @@ module.exports = {
           p.items.revive--;
           mon.hp = Math.ceil(mon.maxHp / 2);
           count++;
-        } else if (mon.hp > 0 && mon.hp < mon.maxHp && p.items.superpotion > 0) {
+        } else if (
+          mon.hp > 0 &&
+          mon.hp < mon.maxHp &&
+          p.items.superpotion > 0
+        ) {
           p.items.superpotion--;
           mon.hp = Math.min(mon.maxHp, mon.hp + 60);
           count++;
-        } else if (mon.hp > 0 && mon.hp < mon.maxHp && p.items.potion > 0) {
+        } else if (
+          mon.hp > 0 &&
+          mon.hp < mon.maxHp &&
+          p.items.potion > 0
+        ) {
           p.items.potion--;
           mon.hp = Math.min(mon.maxHp, mon.hp + 30);
           count++;
@@ -967,8 +1237,7 @@ module.exports = {
       ]);
     }
 
-    // ================= BATTLE ENGINE =================
-
+    // FIGHT
     if (cmd === "fight" || cmd === "battle") {
       if (findBattleFor(id)) {
         return sendText(api, threadID, "Finish your current battle first.");
@@ -985,8 +1254,14 @@ module.exports = {
       const wildMons = [];
 
       for (let i = 0; i < count; i++) {
-        const species = SPECIES_NAMES[Math.floor(Math.random() * SPECIES_NAMES.length)];
-        wildMons.push(makePokemon(species, 5 + Math.floor(Math.random() * 15)));
+        const species = SPECIES_NAMES[
+          Math.floor(Math.random() * SPECIES_NAMES.length)
+        ];
+
+        wildMons.push(makePokemon(
+          species,
+          5 + Math.floor(Math.random() * 15)
+        ));
       }
 
       const npc = {
@@ -1015,20 +1290,32 @@ module.exports = {
       return battleScene(api, threadID, battle, p, npc, "Wild team appeared!");
     }
 
-    // ================= GYM =================
-
+    // GYM
     if (cmd === "gym") {
       const number = Number(args[1]);
       const gym = GYMS.find(g => g.id === number);
 
-      if (!gym) return sendText(api, threadID, "Use p gym 1-8.");
+      if (!gym) {
+        return sendText(api, threadID, "Use p gym 1-8.");
+      }
 
       if (findBattleFor(id)) {
         return sendText(api, threadID, "Finish your current battle first.");
       }
 
-      if (number > 1 && !p.badges.includes(String(number - 1))) {
-        return sendText(api, threadID, `You need ${BADGES[number - 2]} first.`);
+      if (
+        number > 1 &&
+        !p.badges.includes(String(number - 1))
+      ) {
+        return sendText(
+          api,
+          threadID,
+          `You need ${BADGES[number - 2]} first.`
+        );
+      }
+
+      if (p.badges.includes(String(number))) {
+        return sendText(api, threadID, "You already own this Gym Badge.");
       }
 
       const team = getTeam(p);
@@ -1078,11 +1365,17 @@ module.exports = {
 
       save();
 
-      return battleScene(api, threadID, battle, p, npc, `${gym.leader} challenges you!`);
+      return battleScene(
+        api,
+        threadID,
+        battle,
+        p,
+        npc,
+        `${gym.leader} challenges you!`
+      );
     }
 
-    // ================= PVP =================
-
+    // PVP CHALLENGE
     if (cmd === "pvp" || cmd === "challenge") {
       if (findBattleFor(id)) {
         return sendText(api, threadID, "You are already in a battle.");
@@ -1090,9 +1383,17 @@ module.exports = {
 
       const target = Object.keys(event.mentions || {})[0];
 
-      if (!target) return sendText(api, threadID, "Mention a player: p pvp @player");
-      if (target === id) return sendText(api, threadID, "You cannot challenge yourself.");
-      if (findBattleFor(target)) return sendText(api, threadID, "That player is already battling.");
+      if (!target) {
+        return sendText(api, threadID, "Mention a player: p pvp @player");
+      }
+
+      if (target === id) {
+        return sendText(api, threadID, "You cannot challenge yourself.");
+      }
+
+      if (findBattleFor(target)) {
+        return sendText(api, threadID, "That player is already battling.");
+      }
 
       const opponent = getPlayer(target, event.mentions[target]);
 
@@ -1110,13 +1411,20 @@ module.exports = {
 
       save();
 
-      return sendScene(api, threadID, "⚔️ PVP CHALLENGE", `${p.name} challenged ${opponent.name}`, [
-        "Opponent: use p accept",
-        "Both players can bring up to 6 Pokémon.",
-        "The challenger moves first."
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "⚔️ PVP CHALLENGE",
+        `${p.name} challenged ${opponent.name}`,
+        [
+          "Opponent: use p accept",
+          "Both players can bring up to 6 Pokémon.",
+          "The challenger moves first."
+        ]
+      );
     }
 
+    // ACCEPT PVP
     if (cmd === "accept" && sub !== "offer") {
       const offer = DB.offers[id];
 
@@ -1139,29 +1447,41 @@ module.exports = {
       delete DB.offers[id];
 
       const battle = createBattle("pvp", challenger, p, team1, team2);
-
       save();
 
-      return battleScene(api, threadID, battle, challenger, p, "PvP started! Challenger moves first.");
+      return battleScene(
+        api,
+        threadID,
+        battle,
+        challenger,
+        p,
+        "PvP started! Challenger moves first."
+      );
     }
 
-    // ================= ATTACK =================
-
+    // ATTACK
     if (cmd === "attack" || cmd === "hit") {
       const battle = findBattleFor(id);
 
-      if (!battle) return sendText(api, threadID, "You are not in a battle.");
-      if (battle.turn !== id) return sendText(api, threadID, "Wait for your opponent's turn.");
+      if (!battle) {
+        return sendText(api, threadID, "You are not in a battle.");
+      }
+
+      if (battle.turn !== id) {
+        return sendText(api, threadID, "Wait for your opponent's turn.");
+      }
 
       const side = battle.p1 === id ? 1 : 2;
       const attacker = getPlayer(id);
       const defender = getPlayer(side === 1 ? battle.p2 : battle.p1);
 
-      const a = battleMon(attacker, battle, side);
-      const d = battleMon(defender, battle, side === 1 ? 2 : 1);
+      const a = advanceFainted(attacker, battle, side);
+      const d = advanceFainted(defender, battle, side === 1 ? 2 : 1);
 
       if (!a || !d) {
-        return sendText(api, threadID, "No active Pokémon. Try switching.");
+        endBattle(battle, attacker.id, defender.id, "Team defeated");
+
+        return sendText(api, threadID, "Battle completed.");
       }
 
       const move = MOVES.filter(m =>
@@ -1177,7 +1497,6 @@ module.exports = {
       ));
 
       d.hp = Math.max(0, d.hp - damage);
-
       battle.turns++;
 
       battle.lastAction =
@@ -1189,18 +1508,31 @@ module.exports = {
         battle.lastAction += ` ${d.name} fainted!`;
 
         const next = advanceFainted(
-          defender, battle, side === 1 ? 2 : 1
+          defender,
+          battle,
+          side === 1 ? 2 : 1
         );
 
         if (!next) {
-          endBattle(battle, attacker.id, defender.id, "Opponent team defeated");
+          endBattle(
+            battle,
+            attacker.id,
+            defender.id,
+            "Opponent team defeated"
+          );
 
-          return sendScene(api, threadID, "🏆 VICTORY!", `${attacker.name} won!`, [
-            battle.lastAction,
-            `Reward: ${battle.reward || 0} coins`,
-            battle.badgeReward ? `Badge: ${battle.badgeReward}` : "",
-            "Battle data saved."
-          ].filter(Boolean));
+          return sendScene(
+            api,
+            threadID,
+            "🏆 VICTORY!",
+            `${attacker.name} won!`,
+            [
+              battle.lastAction,
+              `Reward: ${battle.reward || 0} coins`,
+              battle.badgeReward ? `Badge: ${battle.badgeReward}` : "",
+              "Battle data saved."
+            ].filter(Boolean)
+          );
         }
 
         battle.lastAction += ` ${defender.name} sent out ${next.name}!`;
@@ -1216,11 +1548,7 @@ module.exports = {
         } else if (alive2 > alive1) {
           endBattle(battle, p2.id, p1.id, "Turn limit");
         } else {
-          battle.status = "ended";
-          battle.reason = "Draw";
-          p.draws++;
-          if (!isNPC(defender.id)) defender.draws++;
-          save();
+          isDrawBattle(battle);
         }
 
         return sendText(api, threadID, "Battle ended: turn limit reached.");
@@ -1228,15 +1556,24 @@ module.exports = {
 
       battle.turn = defender.id;
 
-      save();
-
-      // NPC takes its turn automatically
+      // NPC counterattack
       if (isNPC(defender.id)) {
-        const npcMon = advanceFainted(defender, battle, side === 1 ? 2 : 1);
+        const npcMon = advanceFainted(
+          defender,
+          battle,
+          side === 1 ? 2 : 1
+        );
+
         const humanMon = advanceFainted(attacker, battle, side);
 
         if (!npcMon || !humanMon) {
-          endBattle(battle, attacker.id, defender.id, "Team defeated");
+          endBattle(
+            battle,
+            attacker.id,
+            defender.id,
+            "Team defeated"
+          );
+
           return sendText(api, threadID, "🏆 Battle completed!");
         }
 
@@ -1255,7 +1592,8 @@ module.exports = {
         humanMon.hp = Math.max(0, humanMon.hp - npcDamage);
         battle.turns++;
 
-        battle.lastAction += ` ${npcMon.name} used ${npcMove.name}! ${npcDamage} damage!`;
+        battle.lastAction +=
+          ` ${npcMon.name} used ${npcMove.name}! ${npcDamage} damage!`;
 
         if (humanMon.hp <= 0) {
           battle.lastAction += ` ${humanMon.name} fainted!`;
@@ -1263,15 +1601,41 @@ module.exports = {
           const nextHuman = advanceFainted(attacker, battle, side);
 
           if (!nextHuman) {
-            endBattle(battle, defender.id, attacker.id, "Your team was defeated");
+            endBattle(
+              battle,
+              defender.id,
+              attacker.id,
+              "Your team was defeated"
+            );
 
-            return sendScene(api, threadID, "BATTLE LOST", `${attacker.name} lost!`, [
-              battle.lastAction,
-              "Use p heal to restore your Pokémon."
-            ]);
+            return sendScene(
+              api,
+              threadID,
+              "BATTLE LOST",
+              `${attacker.name} lost!`,
+              [
+                battle.lastAction,
+                "Use p heal to restore your Pokémon."
+              ]
+            );
           }
 
           battle.lastAction += ` Send out ${nextHuman.name}!`;
+        }
+
+        if (battle.turns >= MAX_TURNS) {
+          const alive1 = aliveCount(attacker, battle, side);
+          const alive2 = aliveCount(defender, battle, side === 1 ? 2 : 1);
+
+          if (alive1 > alive2) {
+            endBattle(battle, attacker.id, defender.id, "Turn limit");
+          } else if (alive2 > alive1) {
+            endBattle(battle, defender.id, attacker.id, "Turn limit");
+          } else {
+            isDrawBattle(battle);
+          }
+
+          return sendText(api, threadID, "Battle ended: turn limit reached.");
         }
 
         battle.turn = attacker.id;
@@ -1280,29 +1644,51 @@ module.exports = {
         const players = getBattlePlayers(battle);
 
         return battleScene(
-          api, threadID, battle, players.p1, players.p2,
+          api,
+          threadID,
+          battle,
+          players.p1,
+          players.p2,
           battle.lastAction
         );
       }
 
+      save();
+
       const players = getBattlePlayers(battle);
 
-      return battleScene(api, threadID, battle, players.p1, players.p2);
+      return battleScene(
+        api,
+        threadID,
+        battle,
+        players.p1,
+        players.p2,
+        battle.lastAction
+      );
     }
 
-    // ================= SWITCH =================
-
+    // SWITCH
     if (cmd === "switch") {
       const battle = findBattleFor(id);
 
-      if (!battle) return sendText(api, threadID, "You are not in a battle.");
-      if (battle.turn !== id) return sendText(api, threadID, "Wait for your turn.");
+      if (!battle) {
+        return sendText(api, threadID, "You are not in a battle.");
+      }
+
+      if (battle.turn !== id) {
+        return sendText(api, threadID, "Wait for your turn.");
+      }
 
       const side = battle.p1 === id ? 1 : 2;
       const mon = findPokemon(p, args.slice(1).join(" "));
 
-      if (!mon) return sendText(api, threadID, "Pokémon not found.");
-      if (mon.hp <= 0) return sendText(api, threadID, "That Pokémon has fainted.");
+      if (!mon) {
+        return sendText(api, threadID, "Pokémon not found.");
+      }
+
+      if (mon.hp <= 0) {
+        return sendText(api, threadID, "That Pokémon has fainted.");
+      }
 
       const ids = side === 1 ? battle.team1 : battle.team2;
 
@@ -1327,8 +1713,6 @@ module.exports = {
       const opponentID = side === 1 ? battle.p2 : battle.p1;
       battle.turn = opponentID;
 
-      save();
-
       // NPC counterattack after switch
       if (isNPC(opponentID)) {
         const npc = getPlayer(opponentID);
@@ -1341,20 +1725,30 @@ module.exports = {
           ).sort((a, b) => b.power - a.power)[0] || MOVES[0];
 
           const mult = typeMultiplier(move.type, mon.type);
+
           const damage = Math.max(4, Math.floor(
             (move.power + enemy.attack * 0.45 - mon.defense * 0.25) *
-            mult * (0.85 + Math.random() * 0.3)
+            mult *
+            (0.85 + Math.random() * 0.3)
           ));
 
           mon.hp = Math.max(0, mon.hp - damage);
           battle.turns++;
-          battle.lastAction += ` ${enemy.name} counterattacked for ${damage} damage!`;
+
+          battle.lastAction +=
+            ` ${enemy.name} counterattacked for ${damage} damage!`;
 
           if (mon.hp <= 0) {
             const next = advanceFainted(p, battle, side);
 
             if (!next) {
-              endBattle(battle, opponentID, id, "Your team was defeated");
+              endBattle(
+                battle,
+                opponentID,
+                id,
+                "Your team was defeated"
+              );
+
               return sendText(api, threadID, "Your team was defeated.");
             }
 
@@ -1365,39 +1759,82 @@ module.exports = {
         }
       }
 
+      if (battle.turns >= MAX_TURNS && battle.status === "active") {
+        const playerAlive = aliveCount(p, battle, side);
+        const npcAlive = aliveCount(
+          getPlayer(opponentID),
+          battle,
+          side === 1 ? 2 : 1
+        );
+
+        if (playerAlive > npcAlive) {
+          endBattle(battle, id, opponentID, "Turn limit");
+        } else if (npcAlive > playerAlive) {
+          endBattle(battle, opponentID, id, "Turn limit");
+        } else {
+          isDrawBattle(battle);
+        }
+
+        return sendText(api, threadID, "Battle ended: turn limit reached.");
+      }
+
       save();
 
       const players = getBattlePlayers(battle);
 
-      return battleScene(api, threadID, battle, players.p1, players.p2);
+      return battleScene(
+        api,
+        threadID,
+        battle,
+        players.p1,
+        players.p2,
+        battle.lastAction
+      );
     }
 
-    // ================= SURRENDER =================
-
+    // SURRENDER
     if (cmd === "surrender" || cmd === "forfeit") {
       const battle = findBattleFor(id);
 
-      if (!battle) return sendText(api, threadID, "You are not in a battle.");
+      if (!battle) {
+        return sendText(api, threadID, "You are not in a battle.");
+      }
 
       const opponentID = battle.p1 === id ? battle.p2 : battle.p1;
 
-      endBattle(battle, opponentID, id, "Opponent surrendered");
+      endBattle(
+        battle,
+        opponentID,
+        id,
+        "Opponent surrendered"
+      );
 
-      return sendScene(api, threadID, "🏳️ SURRENDERED", `${p.name} surrendered`, [
-        "Battle ended.",
-        "Your Pokémon remain in storage.",
-        "Heal fainted Pokémon before using them again."
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "🏳️ SURRENDERED",
+        `${p.name} surrendered`,
+        [
+          "Battle ended.",
+          "Your Pokémon remain in storage.",
+          "Heal fainted Pokémon before using them again."
+        ]
+      );
     }
 
-    // ================= TRADE OFFER =================
-
-    if (cmd === "offer" &&
-        ["pokemon", "coins", "badge"].includes(sub)) {
+    // TRADE OFFER
+    if (
+      cmd === "offer" &&
+      ["pokemon", "coins", "badge"].includes(sub)
+    ) {
       const battle = findBattleFor(id);
 
       if (!battle || battle.mode !== "pvp") {
-        return sendText(api, threadID, "Trade offers are available during PvP only.");
+        return sendText(
+          api,
+          threadID,
+          "Trade offers are available during PvP only."
+        );
       }
 
       const opponentID = battle.p1 === id ? battle.p2 : battle.p1;
@@ -1412,25 +1849,50 @@ module.exports = {
       if (sub === "coins") {
         const amount = Math.floor(Number(value));
 
-        if (!Number.isFinite(amount) || amount < 1 || amount > p.coins) {
-          return sendText(api, threadID, "Invalid amount or insufficient coins.");
+        if (
+          !Number.isFinite(amount) ||
+          amount < 1 ||
+          amount > p.coins
+        ) {
+          return sendText(
+            api,
+            threadID,
+            "Invalid amount or insufficient coins."
+          );
         }
 
         data = { type: "coins", amount };
       } else if (sub === "pokemon") {
         const mon = findPokemon(p, value);
 
-        if (!mon) return sendText(api, threadID, "Pokémon not found.");
-
-        if (battle.team1.includes(mon.uid) || battle.team2.includes(mon.uid)) {
-          return sendText(api, threadID, "You cannot offer an active battle Pokémon.");
+        if (!mon) {
+          return sendText(api, threadID, "Pokémon not found.");
         }
 
-        data = { type: "pokemon", uid: mon.uid, name: mon.name };
+        if (
+          battle.team1.includes(mon.uid) ||
+          battle.team2.includes(mon.uid)
+        ) {
+          return sendText(
+            api,
+            threadID,
+            "You cannot offer an active battle Pokémon."
+          );
+        }
+
+        data = {
+          type: "pokemon",
+          uid: mon.uid,
+          name: mon.name
+        };
       } else {
         const number = Number(value);
 
-        if (!Number.isInteger(number) || number < 1 || number > 8) {
+        if (
+          !Number.isInteger(number) ||
+          number < 1 ||
+          number > 8
+        ) {
           return sendText(api, threadID, "Use p offer badge 1-8.");
         }
 
@@ -1456,27 +1918,46 @@ module.exports = {
 
       save();
 
-      return sendScene(api, threadID, "🤝 TRADE OFFER SENT!", `To ${getPlayer(opponentID).name}`, [
-        `Offer: ${data.name || data.amount}`,
-        "Opponent can use p accept offer."
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "🤝 TRADE OFFER SENT!",
+        `To ${getPlayer(opponentID).name}`,
+        [
+          `Offer: ${data.name || data.amount}`,
+          "Opponent can use p accept offer."
+        ]
+      );
     }
 
-    // ================= ACCEPT TRADE =================
-
+    // ACCEPT TRADE
     if (cmd === "accept" && sub === "offer") {
       const offer = DB.offers[id];
 
-      if (!offer || offer.type !== "trade" || offer.expires < Date.now()) {
+      if (
+        !offer ||
+        offer.type !== "trade" ||
+        offer.expires < Date.now()
+      ) {
         return sendText(api, threadID, "No active trade offer.");
       }
 
       const sender = getPlayer(offer.from);
       const data = offer.data;
 
+      if (!data || !data.type) {
+        delete DB.offers[id];
+        save();
+        return sendText(api, threadID, "Invalid trade offer.");
+      }
+
       if (data.type === "coins") {
         if (sender.coins < data.amount) {
-          return sendText(api, threadID, "Sender no longer has enough coins.");
+          return sendText(
+            api,
+            threadID,
+            "Sender no longer has enough coins."
+          );
         }
 
         sender.coins -= data.amount;
@@ -1486,8 +1967,13 @@ module.exports = {
       if (data.type === "pokemon") {
         const mon = sender.pokemon.find(m => m.uid === data.uid);
 
-        if (!mon) return sendText(api, threadID, "Offered Pokémon is unavailable.");
-        if (p.pokemon.length >= MAX_STORAGE) return sendText(api, threadID, "Your storage is full.");
+        if (!mon) {
+          return sendText(api, threadID, "Offered Pokémon is unavailable.");
+        }
+
+        if (p.pokemon.length >= MAX_STORAGE) {
+          return sendText(api, threadID, "Your storage is full.");
+        }
 
         sender.pokemon = sender.pokemon.filter(m => m.uid !== mon.uid);
         sender.team = (sender.team || []).filter(x => x !== mon.uid);
@@ -1503,7 +1989,11 @@ module.exports = {
         const badge = String(data.number);
 
         if (!sender.badges.includes(badge)) {
-          return sendText(api, threadID, "Sender no longer owns this badge.");
+          return sendText(
+            api,
+            threadID,
+            "Sender no longer owns this badge."
+          );
         }
 
         if (p.badges.includes(badge)) {
@@ -1521,17 +2011,23 @@ module.exports = {
 
       save();
 
-      return sendScene(api, threadID, "🤝 TRADE COMPLETE!", "Transfer successful", [
-        data.type === "coins" ? `${data.amount} coins received.` :
-          `${data.name} received.`,
-        `Your coins: ${p.coins}`,
-        `Your Pokémon: ${p.pokemon.length}`,
-        `Your badges: ${p.badges.length}`
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "🤝 TRADE COMPLETE!",
+        "Transfer successful",
+        [
+          data.type === "coins"
+            ? `${data.amount} coins received.`
+            : `${data.name} received.`,
+          `Your coins: ${p.coins}`,
+          `Your Pokémon: ${p.pokemon.length}`,
+          `Your badges: ${p.badges.length}`
+        ]
+      );
     }
 
-    // ================= INVENTORY =================
-
+    // INVENTORY
     if (cmd === "bag" || cmd === "inventory") {
       return sendScene(api, threadID, "TRAINER BAG", p.name, [
         `Poké Balls: ${p.items.pokeball}`,
@@ -1544,8 +2040,7 @@ module.exports = {
       ]);
     }
 
-    // ================= SHOP =================
-
+    // SHOP
     if (cmd === "shop") {
       return sendScene(api, threadID, "POKEMON SHOP", "Buy items with coins", [
         "pokeball — 50 coins",
@@ -1558,9 +2053,13 @@ module.exports = {
       ]);
     }
 
+    // BUY
     if (cmd === "buy") {
       const item = String(args[1] || "").toLowerCase();
-      const amount = Math.max(1, Math.min(99, Math.floor(Number(args[2]) || 1)));
+      const amount = Math.max(
+        1,
+        Math.min(99, Math.floor(Number(args[2]) || 1))
+      );
 
       const prices = {
         pokeball: 50,
@@ -1571,12 +2070,18 @@ module.exports = {
         revive: 200
       };
 
-      if (!prices[item]) return sendText(api, threadID, "Unknown item. Use p shop.");
+      if (!prices[item]) {
+        return sendText(api, threadID, "Unknown item. Use p shop.");
+      }
 
       const total = prices[item] * amount;
 
       if (p.coins < total) {
-        return sendText(api, threadID, `Need ${total} coins. Balance: ${p.coins}`);
+        return sendText(
+          api,
+          threadID,
+          `Need ${total} coins. Balance: ${p.coins}`
+        );
       }
 
       p.coins -= total;
@@ -1591,59 +2096,87 @@ module.exports = {
       ]);
     }
 
-    // ================= EVOLUTION =================
-
+    // EVOLUTION
     if (cmd === "evolve") {
       const mon = findPokemon(p, args.slice(1).join(" "));
 
-      if (!mon) return sendText(api, threadID, "Use p evolve PokémonName.");
+      if (!mon) {
+        return sendText(api, threadID, "Use p evolve PokémonName.");
+      }
 
       const evolution = EVOLUTIONS[mon.name];
 
       if (!evolution) {
-        return sendText(api, threadID, `${mon.name} has no configured evolution.`);
+        return sendText(
+          api,
+          threadID,
+          `${mon.name} has no configured evolution.`
+        );
       }
 
       if (mon.level < evolution[0]) {
-        return sendText(api, threadID, `Needs level ${evolution[0]} to evolve.`);
+        return sendText(
+          api,
+          threadID,
+          `Needs level ${evolution[0]} to evolve.`
+        );
       }
 
       const oldName = mon.name;
+
       mon.name = evolution[1];
       mon.type = speciesType(mon.name);
       mon.maxHp += 15;
       mon.hp = mon.maxHp;
       mon.attack += 5;
       mon.defense += 4;
-      mon.moves = MOVES.filter(m =>
-        m.type === mon.type || m.type === "Normal"
-      ).slice(0, 4).map(m => m.name);
 
-      if (!p.pokedex.includes(mon.name)) p.pokedex.push(mon.name);
+      mon.moves = MOVES
+        .filter(m => m.type === mon.type || m.type === "Normal")
+        .slice(0, 4)
+        .map(m => m.name);
+
+      if (!p.pokedex.includes(mon.name)) {
+        p.pokedex.push(mon.name);
+      }
 
       save();
 
-      return sendScene(api, threadID, "✨ EVOLUTION!", `${oldName} evolved into ${mon.name}!`, [
-        `Level: ${mon.level}`,
-        `HP: ${mon.hp}/${mon.maxHp}`,
-        `Attack: ${mon.attack}`,
-        `Defense: ${mon.defense}`
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "✨ EVOLUTION!",
+        `${oldName} evolved into ${mon.name}!`,
+        [
+          `Level: ${mon.level}`,
+          `HP: ${mon.hp}/${mon.maxHp}`,
+          `Attack: ${mon.attack}`,
+          `Defense: ${mon.defense}`
+        ]
+      );
     }
 
-    // ================= RECOVERY =================
-
+    // RECOVERY CODE
     if (cmd === "recover" || cmd === "recovery") {
-      return sendScene(api, threadID, "RECOVERY CODE", "Keep this code private", [
-        `Code: ${p.recoveryCode}`,
-        "Use p restore CODE to restore a saved profile."
-      ]);
+      return sendScene(
+        api,
+        threadID,
+        "RECOVERY CODE",
+        "Keep this code private",
+        [
+          `Code: ${p.recoveryCode}`,
+          "Use p restore CODE to restore a saved profile."
+        ]
+      );
     }
 
+    // RESTORE
     if (cmd === "restore") {
       const code = String(args[1] || "").toUpperCase();
 
-      if (!code) return sendText(api, threadID, "Use p restore YOUR_CODE.");
+      if (!code) {
+        return sendText(api, threadID, "Use p restore YOUR_CODE.");
+      }
 
       const backup = readJSON(BACKUP_FILE, null);
 
@@ -1659,29 +2192,39 @@ module.exports = {
         return sendText(api, threadID, "Recovery code not found in backup.");
       }
 
-      if (source.id !== id) {
-        return sendText(api, threadID, "This recovery code belongs to another account.");
+      if (String(source.id) !== id) {
+        return sendText(
+          api,
+          threadID,
+          "This recovery code belongs to another account."
+        );
       }
 
       DB.players[id] = JSON.parse(JSON.stringify(source));
       DB.players[id].id = id;
 
+      // Use the restored profile, not the old in-memory reference.
+      const restored = getPlayer(id, name);
+
       save();
 
-      return sendScene(api, threadID, "DATA RESTORED!", p.name, [
-        `Pokémon: ${DB.players[id].pokemon.length}`,
-        `Coins: ${DB.players[id].coins}`,
-        `Badges: ${DB.players[id].badges.length}`,
+      return sendScene(api, threadID, "DATA RESTORED!", restored.name, [
+        `Pokémon: ${restored.pokemon.length}`,
+        `Coins: ${restored.coins}`,
+        `Badges: ${restored.badges.length}`,
         "Your backup profile has been restored."
       ]);
     }
 
-    // ================= SELF DATA RECOVERY =================
-
+    // SELF DATA RECOVERY
     if (cmd === "add" && sub === "coins") {
       const amount = Math.floor(Number(args[2]));
 
-      if (!Number.isFinite(amount) || amount < 1 || amount > 10000) {
+      if (
+        !Number.isFinite(amount) ||
+        amount < 1 ||
+        amount > 10000
+      ) {
         return sendText(api, threadID, "Use p add coins 1-10000.");
       }
 
@@ -1697,16 +2240,26 @@ module.exports = {
     }
 
     if (cmd === "add" && sub === "pokemon") {
-      const name = args.slice(2).join(" ").trim();
-      const species = SPECIES_NAMES.find(x => x.toLowerCase() === name.toLowerCase());
+      const nameArg = args.slice(2).join(" ").trim();
 
-      if (!species) return sendText(api, threadID, "Pokémon not found.");
-      if (p.pokemon.length >= MAX_STORAGE) return sendText(api, threadID, "Storage full.");
+      const species = SPECIES_NAMES.find(
+        x => x.toLowerCase() === nameArg.toLowerCase()
+      );
+
+      if (!species) {
+        return sendText(api, threadID, "Pokémon not found.");
+      }
+
+      if (p.pokemon.length >= MAX_STORAGE) {
+        return sendText(api, threadID, "Storage full.");
+      }
 
       const mon = makePokemon(species, 5, false);
       p.pokemon.push(mon);
 
-      if (!p.pokedex.includes(species)) p.pokedex.push(species);
+      if (!p.pokedex.includes(species)) {
+        p.pokedex.push(species);
+      }
 
       addLog(p, `Pokémon restored: ${species}`);
       save();
@@ -1721,7 +2274,11 @@ module.exports = {
     if (cmd === "add" && sub === "badge") {
       const number = Number(args[2]);
 
-      if (!Number.isInteger(number) || number < 1 || number > 8) {
+      if (
+        !Number.isInteger(number) ||
+        number < 1 ||
+        number > 8
+      ) {
         return sendText(api, threadID, "Use p add badge 1-8.");
       }
 
@@ -1736,32 +2293,45 @@ module.exports = {
       ]);
     }
 
-    // ================= BACKUP =================
-
+    // BACKUP
     if (cmd === "backup") {
       save();
 
-      return sendText(api, threadID, "✅ Pokémon database backup saved.");
-    }
-
-    // ================= HISTORY =================
-
-    if (cmd === "history") {
-      return sendScene(api, threadID, "BATTLE HISTORY", p.name,
-        p.history.slice(0, 10).map((h, i) => `${i + 1}. ${h.message}`)
+      return sendText(
+        api,
+        threadID,
+        "✅ Pokémon database backup saved."
       );
     }
 
-    // ================= RELEASE =================
+    // HISTORY
+    if (cmd === "history") {
+      return sendScene(
+        api,
+        threadID,
+        "BATTLE HISTORY",
+        p.name,
+        p.history.slice(0, 10).map((h, i) =>
+          `${i + 1}. ${h.message}`
+        )
+      );
+    }
 
+    // RELEASE
     if (cmd === "release") {
       if (findBattleFor(id)) {
-        return sendText(api, threadID, "Cannot release Pokémon during battle.");
+        return sendText(
+          api,
+          threadID,
+          "Cannot release Pokémon during battle."
+        );
       }
 
       const mon = findPokemon(p, args.slice(1).join(" "));
 
-      if (!mon) return sendText(api, threadID, "Pokémon not found.");
+      if (!mon) {
+        return sendText(api, threadID, "Pokémon not found.");
+      }
 
       p.pokemon = p.pokemon.filter(m => m.uid !== mon.uid);
       p.team = p.team.filter(x => x !== mon.uid);
@@ -1773,8 +2343,7 @@ module.exports = {
       ]);
     }
 
-    // ================= LEADERBOARD =================
-
+    // LEADERBOARD
     if (cmd === "top" || cmd === "rank") {
       const top = Object.values(DB.players)
         .filter(x => x.id && !isNPC(x.id))
@@ -1784,9 +2353,15 @@ module.exports = {
         )
         .slice(0, 10);
 
-      return sendScene(api, threadID, "🏆 TRAINER LEADERBOARD", "Top trainers", top.map((x, i) =>
-        `${i + 1}. ${x.name} | Wins: ${x.wins || 0} | Coins: ${x.coins || 0}`
-      ));
+      return sendScene(
+        api,
+        threadID,
+        "🏆 TRAINER LEADERBOARD",
+        "Top trainers",
+        top.map((x, i) =>
+          `${i + 1}. ${x.name} | Wins: ${x.wins || 0} | Coins: ${x.coins || 0}`
+        )
+      );
     }
 
     return sendText(api, threadID, usage());
@@ -1794,6 +2369,5 @@ module.exports = {
 
   onReply: async function () {
     // PvP and trade acceptance are command-based.
-    // No reply handler is required.
   }
 };
