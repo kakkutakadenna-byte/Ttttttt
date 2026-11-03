@@ -1,30 +1,15 @@
-global.galiSpamSessions = global.galiSpamSessions || {};
-
 module.exports.config = {
     name: "gali",
-    version: "4.0.0",
+    version: "1.0.0",
     hasPermssion: 0,
     author: "Sami",
-    description: "Massive combined rhythmic and hardcore spam gali command",
+    description: "Simple and working gali command",
     commandCategory: "fun",
-    usages: "[tag / stop]",
-    cooldowns: 5
+    usages: "[tag]",
+    cooldowns: 3
 };
 
 module.exports.onStart = async function({ api, event, args }) {
-    const threadID = event.threadID;
-    const action = args[0];
-
-    if (action === "stop" || action === "off") {
-        if (global.galiSpamSessions[threadID]) {
-            clearInterval(global.galiSpamSessions[threadID]);
-            delete global.galiSpamSessions[threadID];
-            return api.sendMessage("Gali spam stopped successfully!", threadID, event.messageID);
-        } else {
-            return api.sendMessage("No active gali spam running in this group!", threadID, event.messageID);
-        }
-    }
-
     const slangs = [
         "সকালে উঠে করিস ফাউ বকবক,\nতোর মগজে গোবর ভরা, তুই একটা অবালক!",
         "খানকিরপোলা তোর মাইরা চুদি আজ,\nসারাদিন শুধু করিস তুই ফাউ গবাদিপশুর কাজ!",
@@ -45,42 +30,19 @@ module.exports.onStart = async function({ api, event, args }) {
         "মায়ের লগে শুইয়া বড় হইছিস নাকি রে হালায়? ফাও বকিস না তো!",
         "তোর চোদ্দগোষ্ঠী তুইলা গালি দিমু নাকি রে বাল?",
         "সারাদিন তো দেখি শুধু চুদাচুদি নিয়া মাথা ঘামাস, আক্কেলহীন খানকিরপোলা!",
-        "তোর মগজটা গোবর দিয়া ভরপুর, বালছাল কতা বইলো না তো সামনে আইসা!",
-        "মাদারচোদ কোথাকার, ফালতু চুদুরবুদুর একদম বন্ধ করবি!",
-        "তোর গুষ্টির মাথায় মুতি হালায়, ফাউ চুদাস না তো বেশি!",
-        "চুদি তোর গুষ্টি শুদ্ধা, ভাল্লাগে না ফালতু ফাইজলামি!",
-        "তোর বাপের নাম কি ভুইলা গেছোস নাকি রে খানকিরপোলা!",
-        "শালা চুদির ভাই, সারাদিন খালি বাল পাকনামি করিস ক্যান?",
-        "তোর চৌদ্দগোষ্ঠীর গুষ্টি চুদাই, ফাও বকবক বন্ধ কর!",
-        "মাগীর পোলা মাগিবাজি করো কার লগে? আইসো না সামনে!",
-        "বাল পাকনা হালায়, তোর মগজটা ধুইয়া মদ্যপান করায়া দিমু নাকি?",
-        "খানকির পোলা তোর চোদাচুদি বন্ধ না করলে কিক খাইয়া পাবি বাইর হইয়া!",
-        "তোর মাইয়া জাতের গুষ্টি তুলিয়া গালি দিমু একটা টান দিয়া!"
+        "তোর মগজটা গোবর দিয়া ভরপুর, বালছাল কতা বইলো না তো সামনে আইসা!"
     ];
 
-    let targetID = null;
-    let targetName = "";
+    const randomSlang = slangs[Math.floor(Math.random() * slangs.length)];
+
     if (Object.keys(event.mentions).length > 0) {
-        targetID = Object.keys(event.mentions)[0];
-        targetName = event.mentions[targetID].replace("@", "");
+        const taggedID = Object.keys(event.mentions)[0];
+        const name = event.mentions[taggedID].replace("@", "");
+        return api.sendMessage({
+            body: `@${name}\n${randomSlang}`,
+            mentions: [{ tag: `@${name}`, id: taggedID }]
+        }, event.threadID, event.messageID);
+    } else {
+        return api.sendMessage(randomSlang, event.threadID, event.messageID);
     }
-
-    if (global.galiSpamSessions[threadID]) {
-        return api.sendMessage("Spam is already running in this group! To stop, type: /gali stop", threadID, event.messageID);
-    }
-
-    api.sendMessage("Gali spam started! Type /gali stop to stop.", threadID);
-
-    global.galiSpamSessions[threadID] = setInterval(() => {
-        const randomSlang = slangs[Math.floor(Math.random() * slangs.length)];
-
-        if (targetID && targetName) {
-            api.sendMessage({
-                body: `@${targetName}\n${randomSlang}`,
-                mentions: [{ tag: `@${targetName}`, id: targetID }]
-            }, threadID);
-        } else {
-            api.sendMessage(randomSlang, threadID);
-        }
-    }, 1500);
 };
