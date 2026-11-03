@@ -21,9 +21,9 @@ module.exports.onStart = async function({ api, event, args }) {
         if (global.galiSpamSessions[threadID]) {
             clearInterval(global.galiSpamSessions[threadID]);
             delete global.galiSpamSessions[threadID];
-            return api.sendMessage("🛑 গালি স্প্যাম বন্ধ করা হয়েছে!", threadID, event.messageID);
+            return api.sendMessage("Gali spam stopped successfully!", threadID, event.messageID);
         } else {
-            return api.sendMessage("⚠️ এই গ্রুপে বর্তমানে কোনো গালি স্প্যাম চলছে না!", threadID, event.messageID);
+            return api.sendMessage("No active gali spam running in this group!", threadID, event.messageID);
         }
     }
 
@@ -50,7 +50,7 @@ module.exports.onStart = async function({ api, event, args }) {
         "সারাদিন তো দেখি শুধু চুদাচুদি নিয়া মাথা ঘামাস, আক্কেলহীন খানকিরপোলা!",
         "তোর মগজটা গোবর দিয়া ভরপুর, বালছাল কতা বইলো না তো সামনে আইসা!",
         "মাদারচোদ কোথাকার, ফালতু চুদুরবুদুর একদম বন্ধ করবি!",
-        "তোর গুষ্টির মাথায় মুতি হালায়, ফাও চুদাস না তো বেশি!",
+        "তোর গুষ্টির মাথায় মুতি হালায়, ফাউ চুদাস না তো বেশি!",
         "চুদি তোর গুষ্টি শুদ্ধা, ভাল্লাগে না ফালতু ফাইজলামি!",
         "তোর বাপের নাম কি ভুইলা গেছোস নাকি রে খানকিরপোলা?",
         "শালা চুদির ভাই, সারাদিন খালি বাল পাকনামি করিস ক্যান?",
@@ -70,10 +70,10 @@ module.exports.onStart = async function({ api, event, args }) {
     }
 
     if (global.galiSpamSessions[threadID]) {
-        return api.sendMessage("⚠️ ইতিমধ্যে এই গ্রুপে স্প্যাম চলছে! বন্ধ করতে চাইলে লিখুন: `/gali stop`", threadID, event.messageID);
+        return api.sendMessage("Spam is already running in this group! To stop, type: /gali stop", threadID, event.messageID);
     }
 
-    api.sendMessage("🚀 ছন্দ ও হার্ডকোর গালির আনলিমিটেড স্প্যাম শুরু হলো! বন্ধ করতে লিখুন: `/gali stop`", threadID);
+    api.sendMessage("Gali spam started! Type /gali stop to stop.", threadID);
 
     // প্রতি ১.৫ সেকেন্ড পর পর গালি পাঠানোর লুপ
     global.galiSpamSessions[threadID] = setInterval(() => {
@@ -89,4 +89,4 @@ module.exports.onStart = async function({ api, event, args }) {
         }
     }, 1500);
 };
-            
+        
