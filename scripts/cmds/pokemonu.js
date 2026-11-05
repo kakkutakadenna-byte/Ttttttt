@@ -1136,3 +1136,222 @@ module.exports.onStart = async function ({
       return reply("❌ Invalid export code.");
     }
   }
+
+  // ==========================================
+  // PART 4: RANDOM TRAINER CHALLENGES
+  // ==========================================
+
+  if (command === "trainer") {
+    if (!player.pokemon.length) {
+      return reply("Choose a starter first!");
+    }
+
+    const trainers = [
+      "Youngster Joey",
+      "Bug Catcher Sam",
+      "Lass Anna",
+      "Super Nerd Mark",
+      "Pokémon Ranger",
+      "Ace Trainer",
+      "Collector James"
+    ];
+
+    const trainer = trainers[
+      Math.floor(Math.random() * trainers.length)
+    ];
+
+    const species = getRandomPokemon();
+    const opponent = createPokemon(
+      species,
+      5 + Math.floor(Math.random() * 15)
+    );
+
+    const pokemon = player.pokemon.find(
+      p => player.team.includes(p.uid) && p.hp > 0
+    );
+
+    if (!pokemon) {
+      return reply("Your battle team has no healthy Pokémon!");
+    }
+
+    const power = pokemon.attack + pokemon.level * 2;
+    const enemyPower = opponent.attack + opponent.level * 2;
+
+    const won = power >= enemyPower;
+
+    if (won) {
+      const reward = 100 + opponent.level * 10;
+      player.coins += reward;
+      player.xp += 50;
+      player.wins++;
+    } else {
+      pokemon.hp = Math.max(0, pokemon.hp - 15);
+      player.losses++;
+    }
+
+    player.recovery = recoveryCode();
+    saveDB();
+
+    return sendPokemonImage(
+      api,
+      threadID,
+      `🎒 TRAINER ENCOUNTER!\n\n` +
+      `Trainer: ${trainer}\n` +
+      `${pokemon.name} vs ${opponent.name}\n\n` +
+      (won
+        ? `🏆 YOU WON!\nReward: ${100 + opponent.level * 10} Coins\n+50 XP`
+        : `❌ You lost!\n${pokemon.name} lost 15 HP.`) +
+      `\n\nTrainer Recovery: ${player.recovery}`,
+      pokemon,
+      messageID
+    );
+  }
+
+  // ==========================================
+  // PART 4: FRIEND BATTLE CHALLENGE
+  // ==========================================
+
+  if (command === "challenge") {
+    const targetID = Object.keys(event.mentions || {})[0];
+
+    if (!targetID) {
+      return reply("Mention a friend!\nExample: p challenge @friend");
+    }
+
+    if (targetID === senderID) {
+      return reply("You cannot challenge yourself!");
+    }
+
+    if (!player.team.length) {
+      return reply("You need a battle team first!");
+    }
+
+    const opponentPlayer = DB.players[targetID];
+
+    if (!opponentPlayer || !opponentPlayer.started ||
+        !opponentPlayer.team.length) {
+      return reply("Your friend must start Pokémon World first.");
+    }
+
+    if (DB.battles[targetID]) {
+      return reply("Your friend already has a pending battle.");
+    }
+
+    const challengeCode = uid();
+
+    DB.battles[targetID] = {
+      code: challengeCode,
+      from: senderID,
+      to: targetID,
+      threadID,
+      created: Date.now(),
+      status: "pending"
+    };
+
+    saveDB();
+
+    return reply(
+      `⚔️ POKÉMON BATTLE CHALLENGE!\n\n` +
+      `Challenge sent to your friend.\n` +
+      `Battle Code: ${challengeCode}\n\n` +
+      `Your friend can type:\np accept`
+    );
+  }
+
+  // ==========================================
+  // PART 4: ACCEPT FRIEND BATTLE
+  // ==========================================
+
+  if (command === "accept") {
+    const challenge = DB.battles[senderID];
+
+    if (!challenge || challenge.status !== "pending") {
+      return reply("You don't have a pending challenge.");
+    }
+
+    if (Date.now() - challenge.created > 300000) {
+      delete DB.battles[senderID];
+      saveDB();
+      return reply("This battle challenge has expired.");
+    }
+
+    const challenger = DB.players[challenge.from];
+
+    if (!challenger || !challenger.started) {
+      delete DB.battles[senderID];
+      saveDB();
+      return reply("The challenger is no longer available.");
+    }
+
+    const getHealthy = p => p.pokemon.find(
+      x => p.team.includes(x.uid) && x.hp > 0
+    );
+
+    const first = getHealthy(challenger);
+    const second = getHealthy(player);
+
+    if (!first || !second) {
+      return reply("Both trainers need a healthy team Pokémon.");
+    }
+
+    const firstPower = first.attack + first.level * 3;
+    const secondPower = second.attack + second.level * 3;
+
+    const draw = firstPower === secondPower;
+    const firstWins = firstPower > secondPower;
+
+    if (draw) {
+      challenger.losses += 0;
+      player.losses += 0;
+    } else if (firstWins) {
+      challenger.wins++;
+      challenger.coins += 200;
+      player.losses++;
+    } else {
+      player.wins++;
+      player.coins += 200;
+      challenger.losses++;
+    }
+
+    challenger.recovery = recoveryCode();
+    player.recovery = recoveryCode();
+
+    const result = draw
+      ? "🤝 BATTLE DRAW!"
+      : firstWins
+        ? "🏆 CHALLENGER WINS!"
+        : "🏆 DEFENDER WINS!";
+
+    delete DB.battles[senderID];
+
+    saveDB();
+
+    const report =
+      `⚔️ FRIEND BATTLE RESULT\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `${first.name} Lv.${first.level}\n` +
+      `VS\n` +
+      `${second.name} Lv.${second.level}\n` +
+      `━━━━━━━━━━━━━━━━━━\n` +
+      `${result}\n\n` +
+      `Challenger Recovery: ${challenger.recovery}\n` +
+      `Defender Recovery: ${player.recovery}`;
+
+    api.sendMessage(report, challenge.threadID);
+    return reply(report);
+  }
+
+  // ==========================================
+  // PART 4: DECLINE CHALLENGE
+  // ==========================================
+
+  if (command === "decline") {
+    if (!DB.battles[senderID]) {
+      return reply("No pending battle challenge.");
+    }
+
+    delete DB.battles[senderID];
+    saveDB();
+
+    return reply("Battle challenge declined.");
+  }
