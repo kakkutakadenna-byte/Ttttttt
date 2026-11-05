@@ -1,4 +1,3 @@
-
 "use strict";
 
 const fs = require("fs");
@@ -17,7 +16,7 @@ const CONFIG = {
   MAX_STORAGE: 200,
   MAX_LEVEL: 100,
   HUNT_COOLDOWN: 60000,
-  ENCOUNTER_TIME: 120000
+  ENCOUNTER_TIME: 180000
 };
 
 const STARTERS = [
@@ -26,50 +25,12 @@ const STARTERS = [
   { id: 7, name: "Squirtle", type: ["Water"], rarity: "Common" }
 ];
 
-const SPECIES = [
-  { id: 10, name: "Caterpie", type: ["Bug"], rarity: "Common" },
-  { id: 11, name: "Metapod", type: ["Bug"], rarity: "Common" },
-  { id: 12, name: "Butterfree", type: ["Bug", "Flying"], rarity: "Rare" },
-  { id: 16, name: "Pidgey", type: ["Normal", "Flying"], rarity: "Common" },
-  { id: 17, name: "Pidgeotto", type: ["Normal", "Flying"], rarity: "Rare" },
-  { id: 18, name: "Pidgeot", type: ["Normal", "Flying"], rarity: "Epic" },
-  { id: 25, name: "Pikachu", type: ["Electric"], rarity: "Rare" },
-  { id: 26, name: "Raichu", type: ["Electric"], rarity: "Epic" },
-  { id: 37, name: "Vulpix", type: ["Fire"], rarity: "Rare" },
-  { id: 38, name: "Ninetales", type: ["Fire"], rarity: "Epic" },
-  { id: 39, name: "Jigglypuff", type: ["Normal", "Fairy"], rarity: "Rare" },
-  { id: 52, name: "Meowth", type: ["Normal"], rarity: "Common" },
-  { id: 58, name: "Growlithe", type: ["Fire"], rarity: "Rare" },
-  { id: 59, name: "Arcanine", type: ["Fire"], rarity: "Epic" },
-  { id: 74, name: "Geodude", type: ["Rock", "Ground"], rarity: "Common" },
-  { id: 75, name: "Graveler", type: ["Rock", "Ground"], rarity: "Rare" },
-  { id: 76, name: "Golem", type: ["Rock", "Ground"], rarity: "Epic" },
-  { id: 92, name: "Gastly", type: ["Ghost", "Poison"], rarity: "Rare" },
-  { id: 93, name: "Haunter", type: ["Ghost", "Poison"], rarity: "Epic" },
-  { id: 94, name: "Gengar", type: ["Ghost", "Poison"], rarity: "Epic" },
-  { id: 133, name: "Eevee", type: ["Normal"], rarity: "Rare" },
-  { id: 134, name: "Vaporeon", type: ["Water"], rarity: "Epic" },
-  { id: 135, name: "Jolteon", type: ["Electric"], rarity: "Epic" },
-  { id: 136, name: "Flareon", type: ["Fire"], rarity: "Epic" },
-  { id: 147, name: "Dratini", type: ["Dragon"], rarity: "Epic" },
-  { id: 148, name: "Dragonair", type: ["Dragon"], rarity: "Epic" },
-  { id: 149, name: "Dragonite", type: ["Dragon", "Flying"], rarity: "Epic" },
-  { id: 150, name: "Mewtwo", type: ["Psychic"], rarity: "Legendary", unique: true },
-  { id: 151, name: "Mew", type: ["Psychic"], rarity: "Mythical", unique: true },
-  { id: 249, name: "Lugia", type: ["Psychic", "Flying"], rarity: "Legendary", unique: true },
-  { id: 250, name: "Ho-Oh", type: ["Fire", "Flying"], rarity: "Legendary", unique: true },
-  { id: 384, name: "Rayquaza", type: ["Dragon", "Flying"], rarity: "Legendary", unique: true },
-  { id: 487, name: "Giratina", type: ["Ghost", "Dragon"], rarity: "Legendary", unique: true },
-  { id: 493, name: "Arceus", type: ["Normal"], rarity: "Mythical", unique: true },
-  { id: 722, name: "Rowlet", type: ["Grass", "Flying"], rarity: "Rare" },
-  { id: 723, name: "Dartrix", type: ["Grass", "Flying"], rarity: "Rare" },
-  { id: 724, name: "Decidueye", type: ["Grass", "Ghost"], rarity: "Epic" },
-  { id: 725, name: "Litten", type: ["Fire"], rarity: "Rare" },
-  { id: 726, name: "Torracat", type: ["Fire"], rarity: "Rare" },
-  { id: 727, name: "Incineroar", type: ["Fire", "Dark"], rarity: "Epic" },
-  { id: 728, name: "Popplio", type: ["Water"], rarity: "Rare" },
-  { id: 729, name: "Brionne", type: ["Water"], rarity: "Rare" },
-  { id: 730, name: "Primarina", type: ["Water", "Fairy"], rarity: "Epic" }
+const GODS = [
+  { id: 493, name: "Arceus", type: ["Normal"], rarity: "God" },
+  { id: 890, name: "Eternatus", type: ["Poison", "Dragon"], rarity: "God" },
+  { id: 800, name: "Necrozma", type: ["Psychic"], rarity: "God" },
+  { id: 720, name: "Hoopa", type: ["Psychic", "Ghost"], rarity: "God" },
+  { id: 384, name: "Rayquaza", type: ["Dragon", "Flying"], rarity: "God" }
 ];
 
 const GYMS = [
@@ -83,6 +44,26 @@ const GYMS = [
   { name: "Viridian Gym", leader: "Giovanni", type: "Ground", badge: "Earth Badge", level: 60 }
 ];
 
+const SHOP = {
+  pokeball: 100,
+  greatball: 300,
+  ultraball: 700,
+  masterball: 5000,
+  godball: 25000,
+  potion: 150,
+  revive: 500
+};
+
+const BALLS = {
+  pokeball: 1,
+  greatball: 1.5,
+  ultraball: 2,
+  masterball: 100,
+  godball: 100
+};
+
+const GOD_IDS = new Set(GODS.map(x => x.id));
+
 function uid() {
   return "PK-" + crypto.randomBytes(6).toString("hex").toUpperCase();
 }
@@ -93,57 +74,53 @@ function recoveryCode() {
 
 function defaultDB() {
   return {
-    version: 2,
+    version: 3,
     players: {},
     uniquePokemon: {},
+    events: {},
     battles: {},
-    events: {}
+    speciesCache: {}
   };
 }
 
-function saveDB(data = DB) {
-  try {
-    const temp = DB_FILE + ".tmp";
-    fs.writeFileSync(temp, JSON.stringify(data, null, 2));
-    fs.renameSync(temp, DB_FILE);
-
-    fs.writeFileSync(
-      BACKUP_FILE,
-      JSON.stringify(data, null, 2)
-    );
-
-    return true;
-  } catch (error) {
-    console.error("[POKEMONU SAVE ERROR]", error);
-    return false;
-  }
+function writeJSON(file, data) {
+  const temp = file + ".tmp";
+  fs.writeFileSync(temp, JSON.stringify(data, null, 2));
+  fs.renameSync(temp, file);
 }
 
 function loadDB() {
   for (const file of [DB_FILE, BACKUP_FILE]) {
     try {
       if (!fs.existsSync(file)) continue;
-
       const data = JSON.parse(fs.readFileSync(file, "utf8"));
-
       if (!data || typeof data !== "object") continue;
-
       data.players ||= {};
       data.uniquePokemon ||= {};
-      data.battles ||= {};
       data.events ||= {};
-      data.version = 2;
-
+      data.battles ||= {};
+      data.speciesCache ||= {};
+      data.version = 3;
       return data;
-    } catch (error) {
-      console.error("[POKEMONU LOAD ERROR]", error);
+    } catch (e) {
+      console.error("[POKEMONU LOAD]", e);
     }
   }
-
   return defaultDB();
 }
 
 let DB = loadDB();
+
+function saveDB() {
+  try {
+    writeJSON(DB_FILE, DB);
+    writeJSON(BACKUP_FILE, DB);
+    return true;
+  } catch (e) {
+    console.error("[POKEMONU SAVE]", e);
+    return false;
+  }
+}
 
 function getPlayer(id) {
   if (!DB.players[id]) {
@@ -153,48 +130,54 @@ function getPlayer(id) {
       coins: 1000,
       xp: 0,
       level: 1,
-      pokedex: [],
       pokemon: [],
       team: [],
+      pokedex: [],
       badges: [],
       inventory: {
         pokeball: 10,
         greatball: 3,
         ultraball: 1,
+        masterball: 0,
+        godball: 0,
         potion: 5,
         revive: 1
       },
       recovery: recoveryCode(),
       wins: 0,
       losses: 0,
+      draws: 0,
       huntTime: 0,
       catchTime: 0
     };
   }
 
   const p = DB.players[id];
-
   p.pokemon ||= [];
   p.team ||= [];
-  p.badges ||= [];
   p.pokedex ||= [];
+  p.badges ||= [];
   p.inventory ||= {};
-  p.inventory.pokeball ??= 10;
-  p.inventory.greatball ??= 3;
-  p.inventory.ultraball ??= 1;
-  p.inventory.potion ??= 5;
-  p.inventory.revive ??= 1;
   p.coins ??= 1000;
   p.xp ??= 0;
   p.level ??= 1;
+  p.started ??= false;
   p.recovery ||= recoveryCode();
+  p.wins ??= 0;
+  p.losses ??= 0;
+  p.draws ??= 0;
+  p.huntTime ??= 0;
+  p.catchTime ??= 0;
+
+  for (const item of Object.keys(SHOP)) {
+    p.inventory[item] ??= 0;
+  }
 
   return p;
 }
 
 function createPokemon(species, level = 5) {
   const hp = 20 + level * 5;
-
   return {
     uid: uid(),
     speciesId: species.id,
@@ -209,57 +192,62 @@ function createPokemon(species, level = 5) {
     defense: 5 + level,
     moves: ["Tackle"],
     caughtAt: Date.now(),
-    recovery: recoveryCode()
+    recovery: recoveryCode(),
+    shiny: Math.random() < 0.005
   };
 }
 
+function sendText(api, threadID, message, replyID) {
+  return api.sendMessage(message, threadID, null, replyID);
+}
+
 function getSprite(id) {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  return "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/" + id + ".png";
 }
 
 function sendPokemonImage(api, threadID, message, pokemon, replyID) {
-  const url = getSprite(pokemon.speciesId);
+  return new Promise(resolve => {
+    let done = false;
 
-  const fallback = () =>
-    api.sendMessage(message, threadID, null, replyID);
+    const fallback = () => {
+      if (done) return;
+      done = true;
+      resolve(sendText(api, threadID, message, replyID));
+    };
 
-  https.get(url, response => {
-    if (response.statusCode !== 200) {
-      response.resume();
-      return fallback();
-    }
+    const req = https.get(getSprite(pokemon.speciesId), res => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        return fallback();
+      }
 
-    api.sendMessage(
-      { body: message, attachment: response },
-      threadID,
-      error => {
-        if (error) fallback();
-      },
-      replyID
-    );
-  }).on("error", fallback);
-}
+      res.on("error", fallback);
 
-function getRandomPokemon() {
-  const roll = Math.random() * 100;
+      try {
+        api.sendMessage(
+          { body: message, attachment: res },
+          threadID,
+          err => {
+            if (err) fallback();
+            else {
+              done = true;
+              resolve(true);
+            }
+          },
+          replyID
+        );
+      } catch (e) {
+        fallback();
+      }
+    });
 
-  let rarity;
+    req.setTimeout(12000, () => {
+      req.destroy();
+      fallback();
+    });
 
-  if (roll < 1) rarity = "Mythical";
-  else if (roll < 3) rarity = "Legendary";
-  else if (roll < 12) rarity = "Epic";
-  else if (roll < 35) rarity = "Rare";
-  else rarity = "Common";
-
-  let pool = SPECIES.filter(p => p.rarity === rarity);
-
-  if (!pool.length) pool = SPECIES;
-
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function playerHasUnique(species) {
-  return !!DB.uniquePokemon[species.id];
+    req.on("error", fallback);
+  });
 }
 
 function saveProgress(player) {
@@ -267,17 +255,139 @@ function saveProgress(player) {
   return saveDB();
 }
 
+function randomRarity() {
+  const n = Math.random() * 100;
+  if (n < 0.5) return "Mythical";
+  if (n < 2.5) return "Legendary";
+  if (n < 10) return "Epic";
+  if (n < 35) return "Rare";
+  return "Common";
+}
+
+function fallbackSpecies() {
+  const list = [
+    [10, "Caterpie", ["Bug"], "Common"],
+    [16, "Pidgey", ["Normal", "Flying"], "Common"],
+    [25, "Pikachu", ["Electric"], "Rare"],
+    [37, "Vulpix", ["Fire"], "Rare"],
+    [39, "Jigglypuff", ["Normal", "Fairy"], "Rare"],
+    [52, "Meowth", ["Normal"], "Common"],
+    [58, "Growlithe", ["Fire"], "Rare"],
+    [74, "Geodude", ["Rock", "Ground"], "Common"],
+    [92, "Gastly", ["Ghost", "Poison"], "Rare"],
+    [133, "Eevee", ["Normal"], "Rare"],
+    [147, "Dratini", ["Dragon"], "Epic"],
+    [150, "Mewtwo", ["Psychic"], "Legendary"],
+    [151, "Mew", ["Psychic"], "Mythical"],
+    [249, "Lugia", ["Psychic", "Flying"], "Legendary"],
+    [250, "Ho-Oh", ["Fire", "Flying"], "Legendary"],
+    [384, "Rayquaza", ["Dragon", "Flying"], "Legendary"],
+    [487, "Giratina", ["Ghost", "Dragon"], "Legendary"],
+    [493, "Arceus", ["Normal"], "Mythical"]
+  ];
+
+  const rarity = randomRarity();
+  let pool = list.filter(x => x[3] === rarity);
+  if (!pool.length) pool = list.filter(x => x[3] === "Common");
+  const s = pool[Math.floor(Math.random() * pool.length)];
+
+  return { id: s[0], name: s[1], type: s[2], rarity: s[3] };
+}
+
+function apiGet(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { timeout: 12000 }, res => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", chunk => body += chunk);
+      res.on("end", () => {
+        if (res.statusCode !== 200) {
+          return reject(new Error("API status " + res.statusCode));
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("API timeout")));
+    req.on("error", reject);
+  });
+}
+
+async function getRandomPokemon() {
+  const id = 1 + Math.floor(Math.random() * 1025);
+
+  if (DB.speciesCache[id]) {
+    return DB.speciesCache[id];
+  }
+
+  try {
+    const data = await apiGet("https://pokeapi.co/api/v2/pokemon/" + id);
+    const species = {
+      id,
+      name: data.name.charAt(0).toUpperCase() + data.name.slice(1),
+      type: data.types.map(x =>
+        x.type.name.charAt(0).toUpperCase() + x.type.name.slice(1)
+      ),
+      rarity: randomRarity()
+    };
+
+    const god = GODS.find(x => x.id === id);
+    if (god) Object.assign(species, god);
+
+    DB.speciesCache[id] = species;
+    return species;
+  } catch (e) {
+    console.error("[POKEMON API]", e.message);
+    return fallbackSpecies();
+  }
+}
+
+function playerHasUnique(species) {
+  return !!DB.uniquePokemon[species.id];
+}
+
+function registerUnique(player, pokemon) {
+  if (!GOD_IDS.has(pokemon.speciesId)) return true;
+
+  const current = DB.uniquePokemon[pokemon.speciesId];
+  if (current && current.owner !== player.id) return false;
+
+  DB.uniquePokemon[pokemon.speciesId] = {
+    owner: player.id,
+    pokemonUID: pokemon.uid,
+    name: pokemon.name
+  };
+  return true;
+}
+
+function catchChance(rarity, ball) {
+  const base = {
+    Common: 80,
+    Rare: 55,
+    Epic: 35,
+    Legendary: 18,
+    Mythical: 12,
+    God: 4
+  }[rarity] || 50;
+
+  return Math.min(100, base * (BALLS[ball] || 1));
+}
+
 function makePlayerMessage(player) {
   return [
-    "🎮 POKÉMON TRAINER PROFILE",
+    "🎮 POKÉMON WORLD TRAINER",
     "━━━━━━━━━━━━━━━━━━",
     `💰 Coins: ${player.coins}`,
     `⭐ Level: ${player.level}`,
     `✨ XP: ${player.xp}`,
-    `🎒 Pokémon: ${player.pokemon.length}`,
+    `🎒 Pokémon: ${player.pokemon.length}/${CONFIG.MAX_STORAGE}`,
     `🏅 Badges: ${player.badges.length}`,
     `⚔️ Wins: ${player.wins}`,
     `❌ Losses: ${player.losses}`,
+    `🤝 Draws: ${player.draws}`,
     `🔐 Recovery: ${player.recovery}`,
     "━━━━━━━━━━━━━━━━━━"
   ].join("\n");
@@ -286,68 +396,64 @@ function makePlayerMessage(player) {
 module.exports.config = {
   name: "pokemonu",
   aliases: ["p"],
-  version: "2.0.0",
+  version: "3.1.0",
   author: "Si Fat",
   role: 0,
   category: "games",
   shortDescription: "Pokémon World RPG",
-  longDescription: "Pokémon adventure, catching, training and battles.",
+  longDescription: "Pokémon hunting, catching, training, gyms and battles.",
   guide: "{pn} help"
 };
 
-module.exports.onStart = async function ({
-  api,
-  event,
-  args
-}) {
+module.exports.onStart = async function ({ api, event, args }) {
   const { senderID, threadID, messageID } = event;
-
   const command = String(args[0] || "help").toLowerCase();
   const player = getPlayer(senderID);
-
-  const reply = message =>
-    api.sendMessage(message, threadID, null, messageID);
+  const reply = msg => sendText(api, threadID, msg, messageID);
 
   if (command === "help") {
     return reply(
-      "🎮 POKÉMON WORLD ULTIMATE\n" +
-      "━━━━━━━━━━━━━━━━━━\n" +
+      "🎮 POKÉMON WORLD\n━━━━━━━━━━━━━━━━━━\n" +
       "p start - Start journey\n" +
-      "p starter bulbasaur - Choose starter\n" +
+      "p starter bulbasaur/charmander/squirtle\n" +
       "p profile - Trainer profile\n" +
       "p hunt - Find Pokémon\n" +
-      "p catch - Catch Pokémon\n" +
+      "p catch [ball] - Catch Pokémon\n" +
       "p team - View team\n" +
-      "p dex - Pokédex\n" +
+      "p dex [page] - Pokédex\n" +
+      "p god - God Pokémon list\n" +
+      "p god hunt - Search God Pokémon\n" +
       "p info 1 - Pokémon details\n" +
       "p train 1 - Train Pokémon\n" +
-      "p battle 1 - Wild battle\n" +
-      "p evolve 1 - Evolve Pokémon\n" +
       "p heal 1 - Heal Pokémon\n" +
+      "p revive 1 - Revive Pokémon\n" +
+      "p evolve 1 - Evolve Pokémon\n" +
+      "p battle 1 - Wild battle\n" +
       "p gym - Gym list\n" +
+      "p gym 1 - Challenge gym\n" +
       "p shop - Shop\n" +
+      "p buy pokeball 5 - Buy items\n" +
+      "p bag - Inventory\n" +
+      "p badges - View badges\n" +
+      "p setteam 1 - Add to team\n" +
+      "p removeteam 1 - Remove from team\n" +
       "p recovery - Recovery code\n" +
-      "p export - Export data\n" +
-      "p backup - Backup data\n" +
+      "p export - Export trainer\n" +
       "━━━━━━━━━━━━━━━━━━"
     );
   }
 
   if (command === "start") {
-    if (player.started) {
-      return reply("You have already started your Pokémon journey!");
-    }
-
+    if (player.started) return reply("Your journey has already started!");
     player.started = true;
     saveProgress(player);
-
     return reply(
-      "🌍 WELCOME TO THE POKÉMON WORLD!\n\n" +
+      "🌍 Welcome to Pokémon World!\n\n" +
       "Choose your starter:\n" +
       "p starter bulbasaur\n" +
       "p starter charmander\n" +
       "p starter squirtle\n\n" +
-      `🔐 Recovery: ${player.recovery}`
+      "Recovery: " + player.recovery
     );
   }
 
@@ -356,94 +462,108 @@ module.exports.onStart = async function ({
   }
 
   if (command === "starter") {
-    if (player.pokemon.length) {
-      return reply("You already own a starter Pokémon!");
-    }
+    if (player.pokemon.length) return reply("You already have a Pokémon.");
 
-    const choice = String(args[1] || "").toLowerCase();
-    const species = STARTERS.find(
-      p => p.name.toLowerCase() === choice
-    );
-
-    if (!species) {
-      return reply("Choose bulbasaur, charmander or squirtle.");
-    }
+    const name = String(args[1] || "").toLowerCase();
+    const species = STARTERS.find(x => x.name.toLowerCase() === name);
+    if (!species) return reply("Choose bulbasaur, charmander or squirtle.");
 
     const pokemon = createPokemon(species, 5);
-
     player.pokemon.push(pokemon);
     player.team.push(pokemon.uid);
     player.pokedex.push(pokemon.speciesId);
-
     saveProgress(player);
-    pokemon.recovery = player.recovery;
-
-    saveDB();
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `🎉 STARTER OBTAINED!\n\n` +
-      `Name: ${pokemon.name}\n` +
-      `Level: ${pokemon.level}\n` +
-      `Type: ${pokemon.type.join("/")}\n` +
-      `UID: ${pokemon.uid}\n` +
-      `Recovery: ${player.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `🎉 STARTER OBTAINED!\n${pokemon.name}\nLevel: ${pokemon.level}\n` +
+      `Type: ${pokemon.type.join("/")}\nUID: ${pokemon.uid}\n` +
+      `Recovery: ${pokemon.recovery}\nTrainer Recovery: ${player.recovery}`,
+      pokemon, messageID
     );
   }
 
-  if (command === "profile") {
-    return reply(makePlayerMessage(player));
+  if (command === "profile") return reply(makePlayerMessage(player));
+
+  if (command === "god") {
+    if (String(args[1] || "").toLowerCase() === "hunt") {
+      if (Date.now() - player.huntTime < CONFIG.HUNT_COOLDOWN) {
+        return reply("⏳ Wait before hunting again.");
+      }
+
+      player.huntTime = Date.now();
+      const available = GODS.filter(x => !playerHasUnique(x));
+
+      if (!available.length) {
+        saveDB();
+        return reply("Every God Pokémon has already been claimed!");
+      }
+
+      if (Math.random() > 0.03) {
+        saveDB();
+        return reply("🌌 You searched the God Realm, but nothing appeared.");
+      }
+
+      const species = available[Math.floor(Math.random() * available.length)];
+      const wild = createPokemon(species, 60 + Math.floor(Math.random() * 21));
+
+      DB.events[senderID] = {
+        wild,
+        expires: Date.now() + CONFIG.ENCOUNTER_TIME,
+        attempts: 0,
+        god: true
+      };
+      saveDB();
+
+      return sendPokemonImage(
+        api, threadID,
+        `👑 GOD POKÉMON APPEARED!\n${wild.name}\n` +
+        `Level: ${wild.level}\nType: ${wild.type.join("/")}\n` +
+        "Only one copy can be owned!\n" +
+        "Use: p catch godball",
+        wild, messageID
+      );
+    }
+
+    return reply(
+      "👑 GOD POKÉMON ARCHIVE\n━━━━━━━━━━━━━━━━━━\n" +
+      GODS.map((g, i) => {
+        const owner = DB.uniquePokemon[g.id];
+        return `${i + 1}. ${g.name}\nStatus: ${owner ? "Owned" : "Available"}\n` +
+          `Owner: ${owner ? owner.owner : "Nobody"}`;
+      }).join("\n\n") +
+      "\n\nSearch: p god hunt"
+    );
   }
 
   if (command === "hunt") {
-    if (!player.pokemon.length) {
-      return reply("Choose a starter first!");
-    }
+    if (!player.pokemon.length) return reply("Choose a starter first.");
 
-    if (Date.now() - player.huntTime < CONFIG.HUNT_COOLDOWN) {
-      const seconds = Math.ceil(
-        (CONFIG.HUNT_COOLDOWN - (Date.now() - player.huntTime)) / 1000
-      );
-
-      return reply(`⏳ Wait ${seconds} seconds before hunting again.`);
+    const remaining = CONFIG.HUNT_COOLDOWN - (Date.now() - player.huntTime);
+    if (remaining > 0) {
+      return reply(`⏳ Wait ${Math.ceil(remaining / 1000)} seconds.`);
     }
 
     player.huntTime = Date.now();
+    let species = await getRandomPokemon();
 
-    const species = getRandomPokemon();
+    if (playerHasUnique(species)) species = fallbackSpecies();
 
-    if (species.unique && playerHasUnique(species)) {
-      saveDB();
-      return reply("🌲 You explored, but found nothing this time.");
-    }
-
-    const wild = createPokemon(
-      species,
-      3 + Math.floor(Math.random() * 12)
-    );
-
+    const wild = createPokemon(species, 3 + Math.floor(Math.random() * 15));
     DB.events[senderID] = {
       wild,
-      expires: Date.now() + CONFIG.ENCOUNTER_TIME
+      expires: Date.now() + CONFIG.ENCOUNTER_TIME,
+      attempts: 0,
+      god: false
     };
-
     saveDB();
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `🌲 WILD POKÉMON APPEARED!\n\n` +
-      `Name: ${wild.name}\n` +
-      `Type: ${wild.type.join("/")}\n` +
-      `Level: ${wild.level}\n` +
-      `Rarity: ${wild.rarity}\n\n` +
-      "Use p catch to catch it!\n" +
-      "Encounter expires in 2 minutes.",
-      wild,
-      messageID
+      api, threadID,
+      `🌲 WILD POKÉMON APPEARED!\n${wild.name}\n` +
+      `Level: ${wild.level}\nType: ${wild.type.join("/")}\n` +
+      `Rarity: ${wild.rarity}\n\nUse p catch [ball]`,
+      wild, messageID
     );
   }
 
@@ -453,250 +573,256 @@ module.exports.onStart = async function ({
     if (!encounter || encounter.expires < Date.now()) {
       delete DB.events[senderID];
       saveDB();
-      return reply("No active encounter! Use p hunt.");
+      return reply("No active Pokémon. Use p hunt.");
     }
 
     if (player.pokemon.length >= CONFIG.MAX_STORAGE) {
       return reply("Your Pokémon storage is full!");
     }
 
-    if (Date.now() - player.catchTime < 3000) {
-      return reply("Please wait before catching again.");
-    }
-
     const wild = encounter.wild;
-
-    const ball = player.inventory.ultraball > 0
-      ? "ultraball"
-      : player.inventory.greatball > 0
-        ? "greatball"
-        : player.inventory.pokeball > 0
-          ? "pokeball"
-          : null;
+    let ball = String(args[1] || "").toLowerCase();
 
     if (!ball) {
-      return reply("No Poké Balls! Use p shop.");
+      ball = encounter.god ? "godball" :
+        player.inventory.masterball > 0 ? "masterball" :
+        player.inventory.ultraball > 0 ? "ultraball" :
+        player.inventory.greatball > 0 ? "greatball" : "pokeball";
     }
 
-    if (wild.rarity === "Legendary" || wild.rarity === "Mythical") {
-      const registered = SPECIES.find(s => s.id === wild.speciesId);
-
-      if (registered && registered.unique && playerHasUnique(registered)) {
-        delete DB.events[senderID];
-        saveDB();
-        return reply("This unique Pokémon already has an owner!");
-      }
+    if (!BALLS[ball]) {
+      return reply("Use pokeball, greatball, ultraball, masterball or godball.");
     }
 
-    player.catchTime = Date.now();
+    if (!player.inventory[ball]) return reply(`You don't have ${ball}.`);
+    if (encounter.god && !["godball", "masterball"].includes(ball)) {
+      return reply("God Pokémon require Godball or Masterball!");
+    }
 
-    const catchRates = {
-      Common: 75,
-      Rare: 55,
-      Epic: 35,
-      Legendary: 15,
-      Mythical: 10
-    };
-
-    const ballBonus = {
-      pokeball: 0,
-      greatball: 15,
-      ultraball: 25
-    };
-
-    player.inventory[ball]--;
-
-    const success = Math.random() * 100 <
-      Math.min(95, catchRates[wild.rarity] + ballBonus[ball]);
-
-    if (!success) {
+    if (wild.rarity === "God" && playerHasUnique(wild)) {
       delete DB.events[senderID];
       saveDB();
-      return reply(`${wild.name} escaped! Your ${ball} was used.`);
+      return reply("This God Pokémon has already been claimed!");
     }
 
-    wild.recovery = recoveryCode();
+    player.inventory[ball]--;
+    player.catchTime = Date.now();
+    encounter.attempts++;
 
-    player.pokemon.push(wild);
+    const chance = catchChance(wild.rarity, ball);
 
-    if (player.team.length < CONFIG.MAX_TEAM) {
-      player.team.push(wild.uid);
+    if (Math.random() * 100 < chance) {
+      if (!registerUnique(player, wild)) {
+        delete DB.events[senderID];
+        saveDB();
+        return reply("Another trainer claimed this Pokémon first!");
+      }
+
+      wild.recovery = recoveryCode();
+      player.pokemon.push(wild);
+      if (player.team.length < CONFIG.MAX_TEAM) player.team.push(wild.uid);
+      if (!player.pokedex.includes(wild.speciesId)) {
+        player.pokedex.push(wild.speciesId);
+      }
+
+      delete DB.events[senderID];
+      saveProgress(player);
+
+      return sendPokemonImage(
+        api, threadID,
+        `🎉 CAUGHT ${wild.name}!\nLevel: ${wild.level}\n` +
+        `Rarity: ${wild.rarity}\nBall: ${ball}\nUID: ${wild.uid}\n` +
+        `Pokémon Recovery: ${wild.recovery}\nTrainer Recovery: ${player.recovery}`,
+        wild, messageID
+      );
     }
 
-    if (!player.pokedex.includes(wild.speciesId)) {
-      player.pokedex.push(wild.speciesId);
+    const escape = {
+      Common: 8, Rare: 15, Epic: 25,
+      Legendary: 35, Mythical: 45, God: 60
+    }[wild.rarity] || 15;
+
+    if (Math.random() * 100 < escape) {
+      delete DB.events[senderID];
+      saveDB();
+      return reply(`💨 ${wild.name} escaped! Your ${ball} was used.`);
     }
 
-    const species = SPECIES.find(s => s.id === wild.speciesId);
-
-    if (species && species.unique) {
-      DB.uniquePokemon[species.id] = {
-        owner: senderID,
-        pokemonUID: wild.uid
-      };
-    }
-
-    delete DB.events[senderID];
-
-    saveProgress(player);
-    wild.recovery = player.recovery;
+    encounter.expires = Date.now() + CONFIG.ENCOUNTER_TIME;
     saveDB();
 
-    return sendPokemonImage(
-      api,
-      threadID,
-      `🎉 POKÉMON CAUGHT!\n\n` +
-      `Name: ${wild.name}\n` +
-      `Level: ${wild.level}\n` +
-      `Rarity: ${wild.rarity}\n` +
-      `UID: ${wild.uid}\n` +
-      `Recovery: ${player.recovery}\n\n` +
-      "Your Pokémon has been saved!",
-      wild,
-      messageID
+    return reply(
+      `❌ ${wild.name} broke free!\nBall used: ${ball}\n` +
+      `Catch chance: ${chance.toFixed(1)}%\n` +
+      "It is still here. Try another ball!"
     );
   }
+  // ==========================================
+  // TEAM
+  // ==========================================
 
   if (command === "team") {
-    const list = player.team.map((id, index) => {
-      const pokemon = player.pokemon.find(p => p.uid === id);
-
-      return pokemon
-        ? `${index + 1}. ${pokemon.name} Lv.${pokemon.level}\n❤️ ${pokemon.hp}/${pokemon.maxHp}\nUID: ${pokemon.uid}`
+    const list = player.team.map((id, i) => {
+      const p = player.pokemon.find(x => x.uid === id);
+      return p
+        ? `${i + 1}. ${p.name} Lv.${p.level} ❤️ ${p.hp}/${p.maxHp}`
         : null;
     }).filter(Boolean);
 
     return reply(
-      "⚔️ YOUR BATTLE TEAM\n\n" +
-      (list.join("\n\n") || "Your team is empty.") +
-      `\n\n${player.team.length}/6 Pokémon`
+      "⚔️ YOUR TEAM\n\n" +
+      (list.join("\n") || "Your team is empty.") +
+      `\n\nTeam size: ${player.team.length}/${CONFIG.MAX_TEAM}`
     );
   }
 
+  if (command === "setteam") {
+    const index = Number(args[1] || 1) - 1;
+    const p = player.pokemon[index];
+
+    if (!p) return reply("Pokémon not found.");
+    if (player.team.includes(p.uid)) return reply("Already in your team.");
+    if (player.team.length >= CONFIG.MAX_TEAM) {
+      return reply("Team is full. Maximum 6 Pokémon.");
+    }
+
+    player.team.push(p.uid);
+    saveProgress(player);
+    return reply(`${p.name} added to your team!`);
+  }
+
+  if (command === "removeteam") {
+    const index = Number(args[1] || 1) - 1;
+    const p = player.pokemon[index];
+
+    if (!p) return reply("Pokémon not found.");
+    if (!player.team.includes(p.uid)) return reply("Not in your team.");
+    if (player.team.length <= 1) {
+      return reply("You must keep at least one Pokémon in your team.");
+    }
+
+    player.team = player.team.filter(x => x !== p.uid);
+    saveProgress(player);
+    return reply(`${p.name} removed from your team.`);
+  }
+
+  // ==========================================
+  // POKEDEX
+  // ==========================================
+
   if (command === "dex") {
-    const list = player.pokedex.map(id => {
-      const pokemon = SPECIES.find(p => p.id === id);
-      return pokemon ? `#${id} ${pokemon.name}` : null;
-    }).filter(Boolean);
+    const page = Math.max(1, Number(args[1]) || 1);
+    const ids = [...new Set(player.pokedex)].sort((a, b) => a - b);
+    const start = (page - 1) * 30;
+
+    const output = ids.slice(start, start + 30).map(id => {
+      const p = player.pokemon.find(x => x.speciesId === id);
+      const cached = DB.speciesCache[id];
+      return `#${id} ${p ? p.name : cached ? cached.name : "Discovered"}`;
+    });
 
     return reply(
-      `📖 POKÉDEX\n\nDiscovered: ${list.length}\n\n` +
-      (list.join("\n") || "No Pokémon discovered.")
+      `📖 POKÉDEX\nDiscovered: ${ids.length}\nPage: ${page}\n\n` +
+      (output.join("\n") || "No Pokémon found.") +
+      `\n\nNext page: p dex ${page + 1}`
     );
   }
 
   // ==========================================
-  // TRAINING AND LEVEL UP
+  // POKEMON INFO
+  // ==========================================
+
+  if (command === "info") {
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+
+    return sendPokemonImage(
+      api, threadID,
+      `📖 POKÉMON INFO\n\nName: ${p.name}\nLevel: ${p.level}\n` +
+      `XP: ${p.xp}\nType: ${p.type.join("/")}\nRarity: ${p.rarity}\n` +
+      `Shiny: ${p.shiny ? "YES ✨" : "No"}\n` +
+      `HP: ${p.hp}/${p.maxHp}\nAttack: ${p.attack}\n` +
+      `Defense: ${p.defense}\nUID: ${p.uid}\nRecovery: ${p.recovery}`,
+      p, messageID
+    );
+  }
+
+  // ==========================================
+  // TRAIN
   // ==========================================
 
   if (command === "train") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
-
-    if (!pokemon) return reply("Pokémon not found.");
-    if (pokemon.hp <= 0) return reply("Heal your Pokémon first.");
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.hp <= 0) return reply("Your Pokémon has fainted. Revive it first.");
 
     const gained = 20 + Math.floor(Math.random() * 31);
-    pokemon.xp += gained;
+    p.xp += gained;
+    let levelUp = false;
 
-    let message = `🏋️ TRAINING COMPLETE!\n${pokemon.name}\n+${gained} XP`;
-
-    let leveled = false;
-
-    while (
-      pokemon.xp >= pokemon.level * 50 &&
-      pokemon.level < CONFIG.MAX_LEVEL
-    ) {
-      pokemon.xp -= pokemon.level * 50;
-      pokemon.level++;
-      pokemon.maxHp += 5;
-      pokemon.hp = Math.min(pokemon.maxHp, pokemon.hp + 5);
-      pokemon.attack += 2;
-      pokemon.defense += 1;
-      leveled = true;
+    while (p.xp >= p.level * 50 && p.level < CONFIG.MAX_LEVEL) {
+      p.xp -= p.level * 50;
+      p.level++;
+      p.maxHp += 5;
+      p.hp = Math.min(p.maxHp, p.hp + 5);
+      p.attack += 2;
+      p.defense++;
+      levelUp = true;
     }
 
-    if (leveled) {
-      pokemon.recovery = recoveryCode();
-      player.recovery = recoveryCode();
-
-      message +=
-        `\n\n⭐ LEVEL UP!\nLevel: ${pokemon.level}` +
-        `\nUID: ${pokemon.uid}` +
-        `\nRecovery: ${pokemon.recovery}` +
-        `\nTrainer Recovery: ${player.recovery}`;
-    }
-
-    saveDB();
+    p.recovery = recoveryCode();
+    saveProgress(player);
 
     return sendPokemonImage(
-      api, threadID, message, pokemon, messageID
+      api, threadID,
+      `🏋️ TRAINING COMPLETE!\n${p.name}\n+${gained} XP\n` +
+      `Level: ${p.level}\n${levelUp ? "⭐ LEVEL UP!\n" : ""}` +
+      `HP: ${p.hp}/${p.maxHp}\nRecovery: ${p.recovery}`,
+      p, messageID
     );
   }
 
   // ==========================================
-  // HEALING
+  // HEAL
   // ==========================================
 
   if (command === "heal") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
-
-    if (!pokemon) return reply("Pokémon not found.");
-
-    if (player.inventory.potion <= 0) {
-      return reply("You have no Potions! Use p shop.");
-    }
-
-    if (pokemon.hp === pokemon.maxHp) {
-      return reply("This Pokémon is already fully healed.");
-    }
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.hp >= p.maxHp) return reply("Already fully healed.");
+    if (player.inventory.potion <= 0) return reply("No Potions available.");
 
     player.inventory.potion--;
-    pokemon.hp = pokemon.maxHp;
-
-    pokemon.recovery = recoveryCode();
+    p.hp = p.maxHp;
+    p.recovery = recoveryCode();
     saveProgress(player);
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `💚 HEALED!\n${pokemon.name}\n` +
-      `HP: ${pokemon.hp}/${pokemon.maxHp}\n` +
-      `UID: ${pokemon.uid}\nRecovery: ${player.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `💚 ${p.name} healed!\nHP: ${p.hp}/${p.maxHp}\nRecovery: ${p.recovery}`,
+      p, messageID
     );
   }
 
+  // ==========================================
+  // REVIVE
+  // ==========================================
+
   if (command === "revive") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
-
-    if (!pokemon) return reply("Pokémon not found.");
-
-    if (player.inventory.revive <= 0) {
-      return reply("You have no Revives!");
-    }
-
-    if (pokemon.hp > 0) {
-      return reply("This Pokémon has not fainted.");
-    }
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.hp > 0) return reply("This Pokémon has not fainted.");
+    if (player.inventory.revive <= 0) return reply("No Revive available.");
 
     player.inventory.revive--;
-    pokemon.hp = Math.max(1, Math.floor(pokemon.maxHp / 2));
-
-    pokemon.recovery = recoveryCode();
+    p.hp = Math.max(1, Math.floor(p.maxHp / 2));
+    p.recovery = recoveryCode();
     saveProgress(player);
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `✨ REVIVE USED!\n${pokemon.name}\n` +
-      `HP: ${pokemon.hp}/${pokemon.maxHp}\n` +
-      `UID: ${pokemon.uid}\nRecovery: ${player.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `✨ ${p.name} revived!\nHP: ${p.hp}/${p.maxHp}\nRecovery: ${p.recovery}`,
+      p, messageID
     );
   }
 
@@ -705,16 +831,11 @@ module.exports.onStart = async function ({
   // ==========================================
 
   if (command === "evolve") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.level < 16) return reply("Level 16 required for evolution.");
 
-    if (!pokemon) return reply("Pokémon not found.");
-
-    if (pokemon.level < 16) {
-      return reply("Your Pokémon needs level 16 first.");
-    }
-
-    const evolutions = {
+    const evo = {
       Bulbasaur: [2, "Ivysaur", ["Grass", "Poison"]],
       Ivysaur: [3, "Venusaur", ["Grass", "Poison"]],
       Charmander: [5, "Charmeleon", ["Fire"]],
@@ -737,80 +858,37 @@ module.exports.onStart = async function ({
       Eevee: [134, "Vaporeon", ["Water"]]
     };
 
-    const next = evolutions[pokemon.name];
+    const next = evo[p.name];
+    if (!next) return reply("No evolution configured for this Pokémon.");
 
-    if (!next) {
-      return reply(
-        "No evolution is configured for this Pokémon yet."
-      );
+    const oldName = p.name;
+    const oldUID = p.uid;
+
+    p.speciesId = next[0];
+    p.name = next[1];
+    p.type = [...next[2]];
+    p.uid = uid();
+    p.level++;
+    p.maxHp += 20;
+    p.hp = Math.min(p.maxHp, p.hp + 20);
+    p.attack += 10;
+    p.defense += 5;
+    p.recovery = recoveryCode();
+
+    player.team = player.team.map(x => x === oldUID ? p.uid : x);
+
+    if (!player.pokedex.includes(p.speciesId)) {
+      player.pokedex.push(p.speciesId);
     }
 
-    const oldName = pokemon.name;
-    const oldUID = pokemon.uid;
-
-    pokemon.name = next[1];
-    pokemon.speciesId = next[0];
-    pokemon.type = [...next[2]];
-    pokemon.uid = uid();
-    pokemon.recovery = recoveryCode();
-
-    pokemon.level = Math.min(CONFIG.MAX_LEVEL, pokemon.level + 1);
-    pokemon.maxHp += 20;
-    pokemon.hp = pokemon.maxHp;
-    pokemon.attack += 10;
-    pokemon.defense += 5;
-
-    player.team = player.team.map(id =>
-      id === oldUID ? pokemon.uid : id
-    );
-
-    if (!player.pokedex.includes(pokemon.speciesId)) {
-      player.pokedex.push(pokemon.speciesId);
-    }
-
-    player.recovery = recoveryCode();
-    saveDB();
+    saveProgress(player);
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `✨ EVOLUTION!\n\n${oldName} → ${pokemon.name}\n\n` +
-      `Old UID: ${oldUID}\nNew UID: ${pokemon.uid}\n` +
-      `Level: ${pokemon.level}\n` +
-      `HP: ${pokemon.hp}/${pokemon.maxHp}\n` +
-      `Recovery: ${pokemon.recovery}\n` +
-      `Trainer Recovery: ${player.recovery}`,
-      pokemon,
-      messageID
-    );
-  }
-
-  // ==========================================
-  // POKÉMON DETAILS
-  // ==========================================
-
-  if (command === "info") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
-
-    if (!pokemon) return reply("Pokémon not found.");
-
-    return sendPokemonImage(
-      api,
-      threadID,
-      `📖 POKÉMON INFORMATION\n\n` +
-      `Name: ${pokemon.name}\n` +
-      `UID: ${pokemon.uid}\n` +
-      `Level: ${pokemon.level}\n` +
-      `XP: ${pokemon.xp}\n` +
-      `Type: ${pokemon.type.join("/")}\n` +
-      `Rarity: ${pokemon.rarity}\n` +
-      `HP: ${pokemon.hp}/${pokemon.maxHp}\n` +
-      `Attack: ${pokemon.attack}\n` +
-      `Defense: ${pokemon.defense}\n` +
-      `Recovery: ${pokemon.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `✨ EVOLUTION!\n${oldName} → ${p.name}\n` +
+      `New Level: ${p.level}\nOld UID: ${oldUID}\nNew UID: ${p.uid}\n` +
+      `Pokémon Recovery: ${p.recovery}\nTrainer Recovery: ${player.recovery}`,
+      p, messageID
     );
   }
 
@@ -819,117 +897,40 @@ module.exports.onStart = async function ({
   // ==========================================
 
   if (command === "battle") {
-    const index = Number(args[1] || 1) - 1;
-    const pokemon = player.pokemon[index];
+    const p = player.pokemon[Number(args[1] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.hp <= 0) return reply("Your Pokémon has fainted.");
 
-    if (!pokemon) return reply("Pokémon not found.");
-    if (pokemon.hp <= 0) return reply("Heal your Pokémon first.");
-
-    const species = getRandomPokemon();
-
-    const opponent = createPokemon(
+    const species = await getRandomPokemon();
+    const enemy = createPokemon(
       species,
-      Math.max(3, pokemon.level + Math.floor(Math.random() * 5) - 2)
+      Math.max(3, p.level + Math.floor(Math.random() * 5) - 2)
     );
 
-    const chart = {
-      Fire: { Grass: 2, Water: 0.5, Bug: 2, Ice: 2 },
-      Water: { Fire: 2, Ground: 2, Rock: 2, Grass: 0.5 },
-      Grass: { Water: 2, Ground: 2, Rock: 2, Fire: 0.5 },
-      Electric: { Water: 2, Flying: 2, Ground: 0 },
-      Ground: { Electric: 2, Fire: 2, Rock: 2 },
-      Rock: { Flying: 2, Fire: 2, Bug: 2 },
-      Psychic: { Poison: 2, Fighting: 2 },
-      Ghost: { Psychic: 2, Ghost: 2 }
-    };
-
-    function effectiveness(attacker, defender) {
-      let result = 1;
-      const type = attacker.type[0];
-
-      for (const defenseType of defender.type) {
-        if (
-          chart[type] &&
-          chart[type][defenseType] !== undefined
-        ) {
-          result *= chart[type][defenseType];
-        }
-      }
-
-      return result;
-    }
-
-    function damage(attacker, defender) {
-      const base = Math.max(
-        1,
-        attacker.attack - Math.floor(defender.defense / 3)
-      );
-
-      return Math.max(
-        1,
-        Math.floor(base * effectiveness(attacker, defender))
-      );
-    }
-
-    let myHP = pokemon.hp;
-    let enemyHP = opponent.hp;
-    let rounds = 0;
-    const battleLog = [];
-
-    while (myHP > 0 && enemyHP > 0 && rounds < 30) {
-      rounds++;
-
-      const myDamage = damage(pokemon, opponent);
-      enemyHP = Math.max(0, enemyHP - myDamage);
-
-      battleLog.push(
-        `${pokemon.name} dealt ${myDamage} damage!`
-      );
-
-      if (enemyHP <= 0) break;
-
-      const enemyDamage = damage(opponent, pokemon);
-      myHP = Math.max(0, myHP - enemyDamage);
-
-      battleLog.push(
-        `${opponent.name} dealt ${enemyDamage} damage!`
-      );
-    }
-
-    pokemon.hp = myHP;
-
-    const won = enemyHP <= 0;
-
-    let result;
+    const myPower = p.attack + p.level * 2;
+    const enemyPower = enemy.attack + enemy.level * 2;
+    const won = myPower >= enemyPower;
 
     if (won) {
-      const reward = 50 + opponent.level * 5;
-
+      const reward = 50 + enemy.level * 5;
       player.coins += reward;
-      player.xp += 30;
       player.wins++;
-
-      result = `🏆 VICTORY!\n+${reward} Coins\n+30 XP`;
+      p.xp += 30;
+      p.hp = Math.max(1, p.hp - 10);
     } else {
       player.losses++;
-      result = "❌ Battle lost!";
+      p.hp = Math.max(0, p.hp - 25);
     }
 
-    pokemon.recovery = recoveryCode();
+    p.recovery = recoveryCode();
     saveProgress(player);
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `⚔️ BATTLE RESULT\n\n` +
-      `${pokemon.name} VS ${opponent.name}\n` +
-      `Your HP: ${pokemon.hp}/${pokemon.maxHp}\n` +
-      `Enemy HP: ${enemyHP}/${opponent.maxHp}\n\n` +
-      `${result}\n\n` +
-      `UID: ${pokemon.uid}\nRecovery: ${pokemon.recovery}\n` +
-      `Trainer Recovery: ${player.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `⚔️ BATTLE RESULT\n${p.name} VS ${enemy.name}\n\n` +
+      (won ? `🏆 VICTORY!\n+${50 + enemy.level * 5} Coins\n+30 XP` : "❌ DEFEAT!") +
+      `\nYour HP: ${p.hp}/${p.maxHp}\nRecovery: ${p.recovery}`,
+      p, messageID
     );
   }
 
@@ -940,68 +941,53 @@ module.exports.onStart = async function ({
   if (command === "gym") {
     if (!args[1] || args[1] === "list") {
       return reply(
-        "🏅 POKÉMON GYMS\n\n" +
+        "🏅 GYM LEAGUE\n\n" +
         GYMS.map((g, i) =>
-          `${i + 1}. ${g.name}\nLeader: ${g.leader}\n` +
-          `Type: ${g.type}\nBadge: ${g.badge}\nRequired Lv: ${g.level}`
+          `${i + 1}. ${g.name}\nLeader: ${g.leader}\nType: ${g.type}\n` +
+          `Badge: ${g.badge}\nRequired level: ${g.level}`
         ).join("\n\n") +
         "\n\nChallenge: p gym 1"
       );
     }
 
     const gym = GYMS[Number(args[1]) - 1];
-
     if (!gym) return reply("Invalid gym number.");
-
     if (player.badges.includes(gym.badge)) {
-      return reply("You already have this badge!");
+      return reply("You already own this badge.");
     }
 
-    const index = Number(args[2] || 1) - 1;
-    const pokemon = player.pokemon[index];
+    const p = player.pokemon[Number(args[2] || 1) - 1];
+    if (!p) return reply("Pokémon not found.");
+    if (p.level < gym.level) return reply(`Required level: ${gym.level}`);
+    if (p.hp <= 0) return reply("Your Pokémon has fainted.");
 
-    if (!pokemon) return reply("Pokémon not found.");
-
-    if (pokemon.level < gym.level) {
-      return reply(`You need a level ${gym.level} Pokémon.`);
-    }
-
-    if (pokemon.hp <= 0) {
-      return reply("Heal your Pokémon first.");
-    }
-
-    const enemyPower = gym.level * 5 + 20;
-    const myPower = pokemon.attack + pokemon.level * 2;
+    const enemyPower = gym.level * 7;
+    const myPower = p.attack + p.level * 3;
     const won = myPower >= enemyPower;
 
-    if (!won) {
-      pokemon.hp = Math.max(0, pokemon.hp - 20);
+    if (won) {
+      player.badges.push(gym.badge);
+      player.coins += gym.level * 100;
+      player.wins++;
+      p.xp += 100;
+      p.hp = Math.max(1, p.hp - 15);
+    } else {
       player.losses++;
-      saveProgress(player);
-
-      return reply(
-        `❌ ${gym.leader} defeated you!\n` +
-        `${pokemon.name} HP: ${pokemon.hp}/${pokemon.maxHp}`
-      );
+      p.hp = Math.max(0, p.hp - 30);
     }
 
-    player.badges.push(gym.badge);
-    player.coins += 250;
-    player.xp += 100;
-    player.wins++;
-
-    player.recovery = recoveryCode();
-    saveDB();
+    p.recovery = recoveryCode();
+    saveProgress(player);
 
     return sendPokemonImage(
-      api,
-      threadID,
-      `🏆 GYM VICTORY!\n\n` +
-      `Leader: ${gym.leader}\nGym: ${gym.name}\n` +
-      `🏅 ${gym.badge}\n+250 Coins\n+100 XP\n\n` +
-      `UID: ${pokemon.uid}\nRecovery: ${player.recovery}`,
-      pokemon,
-      messageID
+      api, threadID,
+      `🏟️ GYM BATTLE\nLeader: ${gym.leader}\nGym: ${gym.name}\n` +
+      `Your Pokémon: ${p.name}\n` +
+      (won
+        ? `🏆 YOU WON!\n🏅 Badge: ${gym.badge}\n+${gym.level * 100} Coins`
+        : "❌ You lost the gym battle. Train and try again.") +
+      `\nHP: ${p.hp}/${p.maxHp}\nRecovery: ${p.recovery}`,
+      p, messageID
     );
   }
 
@@ -1009,20 +995,12 @@ module.exports.onStart = async function ({
   // SHOP
   // ==========================================
 
-  const SHOP = {
-    pokeball: 100,
-    greatball: 300,
-    ultraball: 700,
-    potion: 150,
-    revive: 500
-  };
-
   if (command === "shop") {
     return reply(
-      "🏪 POKÉMON SHOP\n\n" +
-      Object.entries(SHOP)
-        .map(([name, price]) => `${name}: ${price} coins`)
-        .join("\n") +
+      "🛒 POKÉMON SHOP\n\n" +
+      Object.entries(SHOP).map(([name, price]) =>
+        `${name}: ${price} Coins`
+      ).join("\n") +
       "\n\nBuy: p buy pokeball 5"
     );
   }
@@ -1031,37 +1009,32 @@ module.exports.onStart = async function ({
     const item = String(args[1] || "").toLowerCase();
     const amount = Math.floor(Number(args[2] || 1));
 
-    if (!SHOP[item] || !Number.isSafeInteger(amount) ||
-        amount < 1 || amount > 99) {
-      return reply("Invalid item or quantity.");
+    if (!SHOP[item]) return reply("Unknown shop item. Use p shop.");
+    if (!Number.isFinite(amount) || amount < 1 || amount > 100) {
+      return reply("Amount must be between 1 and 100.");
     }
 
     const cost = SHOP[item] * amount;
-
-    if (player.coins < cost) {
-      return reply("Not enough coins!");
-    }
+    if (player.coins < cost) return reply("Not enough coins.");
 
     player.coins -= cost;
-    player.inventory[item] =
-      (player.inventory[item] || 0) + amount;
-
+    player.inventory[item] += amount;
     saveProgress(player);
 
     return reply(
-      `✅ PURCHASE SUCCESSFUL!\n\n` +
-      `Item: ${item}\nQuantity: ${amount}\n` +
-      `Cost: ${cost}\nBalance: ${player.coins}\n` +
-      `Recovery: ${player.recovery}`
+      `✅ Purchase successful!\nItem: ${item}\nAmount: ${amount}\n` +
+      `Cost: ${cost}\nRemaining coins: ${player.coins}`
     );
   }
 
+  // ==========================================
+  // INVENTORY
+  // ==========================================
+
   if (command === "bag" || command === "inventory") {
     return reply(
-      "🎒 INVENTORY\n\n" +
-      Object.entries(player.inventory)
-        .map(([name, amount]) => `${name}: ${amount}`)
-        .join("\n") +
+      "🎒 YOUR INVENTORY\n\n" +
+      Object.entries(player.inventory).map(([k, v]) => `${k}: ${v}`).join("\n") +
       `\n\nCoins: ${player.coins}`
     );
   }
@@ -1073,409 +1046,110 @@ module.exports.onStart = async function ({
   if (command === "badges") {
     return reply(
       "🏅 YOUR BADGES\n\n" +
-      (player.badges.length
-        ? player.badges.join("\n")
-        : "No badges earned yet.") +
+      (player.badges.join("\n") || "No badges yet.") +
       `\n\nTotal: ${player.badges.length}/8`
     );
   }
 
   // ==========================================
-  // TEAM MANAGEMENT
-  // ==========================================
-
-  if (command === "setteam") {
-    const index = Number(args[1]) - 1;
-    const pokemon = player.pokemon[index];
-
-    if (!pokemon) return reply("Invalid Pokémon number.");
-
-    if (player.team.includes(pokemon.uid)) {
-      return reply("Already in your team.");
-    }
-
-    if (player.team.length >= CONFIG.MAX_TEAM) {
-      return reply("Your team is full (6 Pokémon).");
-    }
-
-    player.team.push(pokemon.uid);
-    saveDB();
-
-    return reply(`${pokemon.name} joined your battle team!`);
-  }
-
-  if (command === "removeteam") {
-    const index = Number(args[1]) - 1;
-
-    if (!Number.isInteger(index) ||
-        index < 0 || index >= player.team.length) {
-      return reply("Invalid team position.");
-    }
-
-    const removed = player.team.splice(index, 1)[0];
-
-    saveDB();
-
-    return reply(`Removed Pokémon UID: ${removed}`);
-  }
-
-  // ==========================================
-  // RANDOM TRAINERS
-  // ==========================================
-
-  if (command === "trainer") {
-    const trainers = [
-      "Youngster Joey",
-      "Bug Catcher Sam",
-      "Lass Anna",
-      "Super Nerd Mark",
-      "Pokémon Ranger",
-      "Ace Trainer",
-      "Collector James"
-    ];
-
-    const pokemon = player.pokemon.find(
-      p => player.team.includes(p.uid) && p.hp > 0
-    );
-
-    if (!pokemon) {
-      return reply("You need a healthy team Pokémon.");
-    }
-
-    const trainer = trainers[
-      Math.floor(Math.random() * trainers.length)
-    ];
-
-    const species = getRandomPokemon();
-    const enemy = createPokemon(
-      species,
-      5 + Math.floor(Math.random() * 15)
-    );
-
-    const won =
-      pokemon.attack + pokemon.level * 2 >=
-      enemy.attack + enemy.level * 2;
-
-    if (won) {
-      const reward = 100 + enemy.level * 10;
-      player.coins += reward;
-      player.xp += 50;
-      player.wins++;
-    } else {
-      pokemon.hp = Math.max(0, pokemon.hp - 15);
-      player.losses++;
-    }
-
-    saveProgress(player);
-
-    return sendPokemonImage(
-      api,
-      threadID,
-      `🎒 TRAINER BATTLE!\n\n` +
-      `Trainer: ${trainer}\n` +
-      `${pokemon.name} VS ${enemy.name}\n\n` +
-      (won
-        ? `🏆 VICTORY!\n+${100 + enemy.level * 10} Coins\n+50 XP`
-        : `❌ DEFEAT!\n${pokemon.name} lost 15 HP.`) +
-      `\n\nRecovery: ${player.recovery}`,
-      pokemon,
-      messageID
-    );
-  }
-
-  // ==========================================
-  // FRIEND CHALLENGES
-  // ==========================================
-
-  if (command === "challenge") {
-    const targetID = Object.keys(event.mentions || {})[0];
-
-    if (!targetID) {
-      return reply("Mention a friend: p challenge @friend");
-    }
-
-    if (targetID === senderID) {
-      return reply("You cannot challenge yourself!");
-    }
-
-    if (DB.battles[targetID]) {
-      return reply("This player already has a pending challenge.");
-    }
-
-    const opponent = DB.players[targetID];
-
-    if (!opponent || !opponent.started) {
-      return reply("Your friend must start Pokémon World first.");
-    }
-
-    const healthy = p => p.pokemon.some(
-      x => p.team.includes(x.uid) && x.hp > 0
-    );
-
-    if (!healthy(player) || !healthy(opponent)) {
-      return reply("Both trainers need a healthy team Pokémon.");
-    }
-
-    const code = uid();
-
-    DB.battles[targetID] = {
-      code,
-      from: senderID,
-      to: targetID,
-      threadID,
-      created: Date.now()
-    };
-
-    saveDB();
-
-    return reply(
-      `⚔️ BATTLE CHALLENGE SENT!\n\n` +
-      `Battle Code: ${code}\n` +
-      `Your friend can type: p accept`
-    );
-  }
-
-  if (command === "accept") {
-    const challenge = DB.battles[senderID];
-
-    if (!challenge) {
-      return reply("No pending battle challenge.");
-    }
-
-    if (Date.now() - challenge.created > 300000) {
-      delete DB.battles[senderID];
-      saveDB();
-      return reply("Challenge expired.");
-    }
-
-    const challenger = DB.players[challenge.from];
-
-    if (!challenger) {
-      delete DB.battles[senderID];
-      saveDB();
-      return reply("Challenger not found.");
-    }
-
-    const first = challenger.pokemon.find(
-      p => challenger.team.includes(p.uid) && p.hp > 0
-    );
-
-    const second = player.pokemon.find(
-      p => player.team.includes(p.uid) && p.hp > 0
-    );
-
-    if (!first || !second) {
-      return reply("Both players need healthy Pokémon.");
-    }
-
-    const firstPower = first.attack + first.level * 3;
-    const secondPower = second.attack + second.level * 3;
-
-    let result;
-
-    if (firstPower === secondPower) {
-      result = "🤝 DRAW!";
-    } else if (firstPower > secondPower) {
-      result = "🏆 CHALLENGER WINS!";
-      challenger.wins++;
-      challenger.coins += 200;
-      player.losses++;
-    } else {
-      result = "🏆 DEFENDER WINS!";
-      player.wins++;
-      player.coins += 200;
-      challenger.losses++;
-    }
-
-    challenger.recovery = recoveryCode();
-    player.recovery = recoveryCode();
-
-    delete DB.battles[senderID];
-    saveDB();
-
-    const report =
-      `⚔️ FRIEND BATTLE RESULT\n\n` +
-      `${first.name} VS ${second.name}\n\n` +
-      `${result}\n\n` +
-      `Challenger Recovery: ${challenger.recovery}\n` +
-      `Defender Recovery: ${player.recovery}`;
-
-    api.sendMessage(report, challenge.threadID);
-    return reply(report);
-  }
-
-  if (command === "decline") {
-    if (!DB.battles[senderID]) {
-      return reply("No pending challenge.");
-    }
-
-    delete DB.battles[senderID];
-    saveDB();
-
-    return reply("Battle challenge declined.");
-  }
-
-  // ==========================================
-  // RECOVERY AND BACKUP
+  // RECOVERY / EXPORT
   // ==========================================
 
   if (command === "recovery") {
     return reply(
       "🔐 TRAINER RECOVERY\n\n" +
-      `Trainer ID: ${senderID}\n` +
-      `Recovery Code: ${player.recovery}\n\n` +
-      "Use p export to save your complete trainer data."
+      `Your recovery code:\n${player.recovery}\n\n` +
+      "Keep this code safe. It identifies your trainer, but cannot restore deleted data by itself.\n" +
+      "Use p export to create a backup."
     );
-  }
-
-  if (command === "backup") {
-    if (!saveDB()) {
-      return reply("❌ Backup failed.");
-    }
-
-    return reply("✅ Pokémon World database backup saved.");
   }
 
   if (command === "export") {
     const snapshot = {
-      version: 2,
-      player: JSON.parse(JSON.stringify(player)),
-      exportedAt: Date.now()
+      version: 1,
+      id: player.id,
+      recovery: player.recovery,
+      data: player
     };
 
-    const encoded = Buffer.from(
-      JSON.stringify(snapshot)
-    ).toString("base64");
+    const encoded = Buffer.from(JSON.stringify(snapshot)).toString("base64");
 
     return reply(
-      "🔐 YOUR TRAINER BACKUP\n\n" +
-      "Save this entire code safely:\n\n" +
-      encoded
+      "📦 TRAINER EXPORT\n\n" +
+      encoded +
+      "\n\nSave this entire code somewhere safe. Use p restore followed by the code to restore."
     );
   }
 
   if (command === "restore") {
-    const encoded = args[1];
-
-    if (!encoded || encoded.length > 500000) {
-      return reply("Provide a valid backup code.");
-    }
+    const encoded = String(args[1] || "").trim();
+    if (!encoded) return reply("Usage: p restore YOUR_EXPORT_CODE");
 
     try {
-      const snapshot = JSON.parse(
-        Buffer.from(encoded, "base64").toString("utf8")
-      );
-
-      const restored = snapshot.player;
+      const snapshot = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+      const data = snapshot.data;
 
       if (
-        snapshot.version !== 2 ||
-        !restored ||
-        !Array.isArray(restored.pokemon) ||
-        !Array.isArray(restored.team) ||
-        !Array.isArray(restored.badges) ||
-        !Array.isArray(restored.pokedex) ||
-        !restored.inventory ||
-        !Number.isSafeInteger(restored.coins) ||
-        restored.coins < 0 ||
-        restored.pokemon.length > CONFIG.MAX_STORAGE ||
-        restored.team.length > CONFIG.MAX_TEAM
+        !data ||
+        !Array.isArray(data.pokemon) ||
+        !Array.isArray(data.team) ||
+        !Array.isArray(data.pokedex) ||
+        !Array.isArray(data.badges) ||
+        !data.inventory ||
+        !Number.isFinite(data.coins) ||
+        data.pokemon.length > CONFIG.MAX_STORAGE
       ) {
-        return reply("Invalid or damaged backup.");
+        return reply("Invalid backup data.");
       }
 
-      const validPokemon = restored.pokemon.every(p =>
-        p &&
-        typeof p.uid === "string" &&
-        typeof p.name === "string" &&
-        Number.isInteger(p.level) &&
-        p.level >= 1 &&
-        p.level <= CONFIG.MAX_LEVEL &&
-        Number.isInteger(p.hp) &&
-        Number.isInteger(p.maxHp) &&
-        p.hp >= 0 &&
-        p.hp <= p.maxHp &&
-        Array.isArray(p.type)
-      );
-
-      if (!validPokemon) {
-        return reply("Backup contains invalid Pokémon data.");
-      }
-
-      const validUIDs = new Set(
-        restored.pokemon.map(p => p.uid)
-      );
-
-      if (
-        restored.team.some(id => !validUIDs.has(id)) ||
-        new Set(restored.pokemon.map(p => p.uid)).size !==
-        restored.pokemon.length
-      ) {
-        return reply("Backup has invalid or duplicate Pokémon UIDs.");
-      }
-
-      const oldPlayer = DB.players[senderID];
-
-      // Do not allow another trainer to claim a unique Pokémon.
-      for (const pokemon of restored.pokemon) {
-        const species = SPECIES.find(
-          s => s.id === pokemon.speciesId && s.unique
-        );
-
-        if (!species) continue;
-
-        const owner = DB.uniquePokemon[species.id];
-
+      for (const p of data.pokemon) {
         if (
-          owner &&
-          owner.owner !== senderID &&
-          (!oldPlayer || !oldPlayer.pokemon.some(
-            p => p.uid === owner.pokemonUID
-          ))
+          !p ||
+          !Number.isFinite(p.speciesId) ||
+          typeof p.name !== "string" ||
+          typeof p.uid !== "string" ||
+          !Number.isFinite(p.level) ||
+          !Number.isFinite(p.hp) ||
+          !Number.isFinite(p.maxHp)
         ) {
-          return reply(
-            `${pokemon.name} is already registered to another trainer.`
-          );
+          return reply("Backup contains invalid Pokémon data.");
         }
       }
 
-      restored.id = senderID;
-      restored.recovery = recoveryCode();
+      const uniqueInBackup = data.pokemon.filter(p => GOD_IDS.has(p.speciesId));
 
-      DB.players[senderID] = restored;
-
-      // Rebuild unique Pokémon ownership for this trainer.
-      for (const pokemon of restored.pokemon) {
-        const species = SPECIES.find(
-          s => s.id === pokemon.speciesId && s.unique
-        );
-
-        if (species) {
-          DB.uniquePokemon[species.id] = {
-            owner: senderID,
-            pokemonUID: pokemon.uid
-          };
+      for (const p of uniqueInBackup) {
+        const owner = DB.uniquePokemon[p.speciesId];
+        if (owner && owner.owner !== senderID) {
+          return reply(`${p.name} is already owned by another trainer. Restore denied.`);
         }
+      }
+
+      data.id = senderID;
+      data.recovery = recoveryCode();
+      data.started = true;
+
+      DB.players[senderID] = data;
+
+      for (const p of uniqueInBackup) {
+        DB.uniquePokemon[p.speciesId] = {
+          owner: senderID,
+          pokemonUID: p.uid,
+          name: p.name
+        };
       }
 
       saveDB();
 
       return reply(
-        "✅ TRAINER RESTORED!\n\n" +
-        `Pokémon: ${restored.pokemon.length}\n` +
-        `Coins: ${restored.coins}\n` +
-        `Level: ${restored.level}\n` +
-        `Badges: ${restored.badges.length}\n` +
-        `New Recovery: ${restored.recovery}`
+        "✅ TRAINER RESTORED!\n" +
+        `Pokémon: ${data.pokemon.length}\n` +
+        `New recovery code: ${data.recovery}`
       );
-
-    } catch (error) {
-      console.error("[POKEMONU RESTORE]", error);
-      return reply("❌ Invalid backup code.");
+    } catch (e) {
+      return reply("Invalid export code. Make sure the entire code was copied.");
     }
   }
 
-  return reply(
-    "Unknown Pokémon command!\nType p help."
-  );
-};
+  return reply("Unknown command. Use p help.");
+};  
